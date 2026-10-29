@@ -53,6 +53,9 @@ import {
 
 const BACKGROUND_MUSIC_URL = 'assets/audio/bgm_synth_ambient.mp3';
 
+// Public address appended to shared results. Keep in sync with the URLs in index.html.
+const SHARE_URL = 'https://aidle-two.vercel.app';
+
 const ASSETS_MANIFEST: Record<string, string> = {
   logo: '/images/app_logo_mark.png',
   trophy: '/images/icon_trophy_gold.png',
@@ -941,7 +944,7 @@ export default function App() {
 
     const activeDiff = gameMode === 'daily' ? 'medium' : difficulty;
     const modeLabel = gameMode === 'daily' ? 'Daily' : `Practice (${activeDiff.toUpperCase()})`;
-    const shareText = `AIdle #${todayNum} • ${totalTries} guesses • Score: ${earnedScore}\nMode: ${modeLabel}\n\n${gridString.trim()}\nPlay at: aidle.app`;
+    const shareText = `AIdle #${todayNum} • ${totalTries} guesses • Score: ${earnedScore}\nMode: ${modeLabel}\n\n${gridString.trim()}\nPlay at: ${SHARE_URL}`;
 
     const success = await copyToClipboard(shareText);
     if (success) {
