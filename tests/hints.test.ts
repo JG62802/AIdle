@@ -143,7 +143,7 @@ test('sanitizeHint strips Copilot, Perplexity, and Microsoft references', () => 
 
 test('R7: every stylometry hint quotes the response and has at least 12 words, for featured and other models alike', () => {
   const stylometry = collectPlayerVisibleHints().filter((r) => r.slot === 'stylometryClue');
-  assert.equal(stylometry.length, 150);
+  assert.equal(stylometry.length, 152);
   for (const r of stylometry) {
     assert.match(r.text, /"[^"]+"/, `${r.challengeId}/${r.targetModelId}: no quoted evidence`);
     assert.ok(r.text.split(/\s+/).length >= 12, `${r.challengeId}/${r.targetModelId}: under 12 words`);

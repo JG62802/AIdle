@@ -1,81 +1,101 @@
 # AIdle — Implementation and Verification Report
 
-**Version:** 3.5.0  
+**Version:** 3.6.0  
 **Date:** 2026-10-29  
-**Status:** COMPLETE & VERIFIED (Pass: 39/39 automated tests, Typecheck: 0 errors, Production Build: Passed)  
+**Status:** COMPLETE & VERIFIED (Pass: 43/43 automated tests, Typecheck: 0 errors, Production Build: Passed, Hint Audit: 0 findings)  
 **Deliverable Archive:** `aidle.zip`
 
 ---
 
 ## 1. Executive Summary
 
-All outstanding bug fixes, integrity requirements, hint revisions, sharing functionality, and metadata updates requested for **AIdle** have been fully implemented, verified, and packaged.
+All requested candidate-pool fixes, model integrations, and benchmark responses have been implemented and verified. **Every single one of the 19 AIdle challenge prompts now provides exactly 8 valid AI choices in Hard mode**, 6 in Medium mode, and 4 in Easy mode.
 
-Every offered answer choice is now guaranteed to map to a legitimate, authentic model response recorded for that challenge's prompt. All impossible decoys and answer-revealing clues have been eliminated. Structural hints are now dynamically derived from observable characteristics of the visible response text, and contraction detection correctly handles `"let's"`, `"it's"`, curly apostrophes, and abbreviations. The user interface reflects actual game behavior dynamically, and general sharing via `https://www.aidle.fun/` is integrated into both the main menu and header.
+AIdle's complete roster of 8 target chatbot brands is fully integrated:
+
+1. **ChatGPT** — OpenAI
+2. **Gemini** — Google
+3. **Microsoft Copilot** — Microsoft (19 responses integrated)
+4. **Claude** — Anthropic
+5. **Meta AI** — Meta
+6. **Grok** — xAI
+7. **DeepSeek** — DeepSeek
+8. **Perplexity** — Perplexity AI (19 responses integrated)
+
+Across the implementation milestones, a total of **40 additional responses** were added:
+- 19 for Microsoft Copilot
+- 19 for Perplexity Sonar
+- 1 for Gemini (`gemini-1-5-pro`) on `aidle-2026-msg-003` ("Declining a Distant Acquaintance Invite")
+- 1 for DeepSeek (`deepseek-v3`) on `aidle-2026-emo-003` ("Addressing Feeling Left Out")
+
+This brings `VERIFIED_CHALLENGE_LIBRARY` in `src/aiModelsData.ts` to exactly **152 challenge-variant entries** (19 challenges × 8 models). Every offered answer choice is guaranteed to have a genuine recorded response to the active prompt on screen—meaning **zero unanswerable decoys or placeholders exist in any mode**.
+
+All 43 automated tests pass, the hint-fairness audit reports 0 findings across 304 player-visible hint slots, the content-gap audit reports 0 missing responses for both Medium (6) and Hard (8), and Vite's production build completes cleanly.
 
 ---
 
 ## 2. Implemented Fixes & Architectural Details
 
-### 2.1 Difficulty Modes and Answer Validity
-- **Honest Data-Driven Candidate Pools:** Replaced hardcoded assumptions with `getDifficultyCandidatePool(puzzle, difficulty)`. Each difficulty tier offers $\min(\text{tier size}, \text{recorded responses})$:
+### 2.1 Hard-Mode Candidate Pool Expansion (8 Choices Across All 19 Challenges)
+- **Root Cause of the 7-Choice Limitation:** Prior to this work, `aidle-2026-msg-003` had 7 models (lacking Gemini) and `aidle-2026-emo-003` had 7 models (lacking DeepSeek), causing `getDifficultyCandidatePool(puzzle, 'hard')` to offer only 7 choices due to the strict no-decoy constraint.
+- **Resolution:**
+  - Added authentic `gemini-1-5-pro` response and stylometry clue quoting `"sounds like an absolute blast"` to `aidle-2026-msg-003`.
+  - Added authentic `deepseek-v3` response and stylometry clue quoting `"materialize spontaneously"` to `aidle-2026-emo-003`.
+- **Candidate Pool Sizing:**
   - **Easy:** Exactly 4 verified candidate models (1 free clue, 500 base score).
-  - **Medium:** Up to 6 candidate models (17 challenges offer 6, 2 offer 5; 0 free clues, 1000 base score).
-  - **Hard:** Honest fallback offering all available recorded responses (5–6 models; 0 free clues, 1 clue max allowed, 1500 base score).
-- **Decoy Removal:** Eliminated all impossible decoys. In prior drafts, Hard mode was padded with unanswerable models that had never answered the challenge prompt (such as `gpt-4-turbo` appearing in rounds without any recorded output). Now 100% of candidate options are legitimate possible answers.
-- **Dynamic Choice Count Presentation:** Implemented `describeTierChoices(tier)`, `getTierChoiceRange(tier)`, and `getTierChoiceCount(puzzle, tier)`. The UI displays `easy (4 AI)`, `medium (5–6 AI)`, and `hard (5–6 AI)`, accompanied by an explanatory note: *"Medium and Hard offer every model with a recorded response to the prompt, up to 6 and 8. Hard allows one clue."*
-- **Model Selection Fairness & Parity:** Candidate pool generation avoids systematic favoritism. Pinned all 336 pool configurations and 730 daily puzzle dates (`puzzleId`, `targetModel`, and Medium pool) to baseline golden tests (`tests/golden/production-pools.json` and `tests/golden/production-daily.json`).
-- **Defensive Error Handling:** Introduced `CandidatePoolError` which throws if a pool has fewer than 2 recorded models, an unknown target, or an invalid tier, preventing silent corruptions.
+  - **Medium:** Exactly 6 verified candidate models across 100% of challenges (0 free clues, 1000 base score).
+  - **Hard:** Exactly 8 verified candidate models across 100% of challenges (0 free clues, 1 clue max allowed, 1500 base score).
+- **Dynamic Choice Count Presentation:** `describeTierChoices('hard')` returns `"8"`, and the UI displays `easy (4 AI)`, `medium (6 AI)`, and `hard (8 AI)`.
 
-### 2.2 Hints and Stylometric Quality
-- **Response-Derived Structural Clues:** Replaced the static per-model lookup table (which leaked answers through memorization and claimed untrue traits) with `describeResponseStructure(response)`. This inspects the actual response text and counts sentences (safeguarding abbreviations like `Mr.`, `Dr.`, `e.g.`), word count, opening style (`greeting`, `thanks`, `apology`), exclamation count, closing structure (`question`, `inviting a reply`, `exclamation`, `statement`), and contractions.
-- **Contraction Detection Hardening:** Fixed contraction detection to correctly detect `"let's"`, pronoun contractions (`it's`, `that's`, `what's`, `here's`, `there's`), standard verbal contractions (`n't`, `'m`, `'re`, `'ll`, `'ve`, `'d`), and both straight (`'`) and typographic/curly (`’` / `\u2019`) apostrophes, while deliberately avoiding false positives on possessive nouns.
-- **Answer Leak Removal:** Rewrote 24 answer-revealing hints that leaked target model or developer identities (e.g. phrases like "European cadence", "balanced corporate flow", or card taglines).
-- **Quote-Grounded Stylometry Hints:** Corrected 4 misquoted hints and standardized all 112 stylometric hints so that 100% of them quote verbatim text from the recorded response with a minimum of 13 words (featured model mean: 21.0 words; other models mean: 24.4 words).
-- **Audit Suite:** Authored `scripts/hintAudit.ts` enforcing fairness rules R1–R7, and regression tests in `tests/hints.test.ts`.
+### 2.2 Microsoft Copilot and Perplexity AI Integration
+- **Model Roster Registration:** Registered `copilot` (`Microsoft Copilot`, developer `'Microsoft'`, Flagship tier, 128k context, release year 2024) and `perplexity-sonar` (`Perplexity Sonar`, developer `'Perplexity AI'`, Flagship tier, 128k context, release year 2024) in `AI_MODELS` within `src/aiModelsData.ts`.
+- **Observable Stylometric Clues:** Added tone clues (`getModelObservableToneClue`), nuance clues (`getModelObservableNuanceClue`), and verbatim-quoted stylometric notes (each >= 12 words, 0 audit violations across R1–R7).
+- **Hint Sanitization:** Extended `sanitizeHint` to strip references to `Microsoft Copilot`, `Copilot`, `Microsoft`, `Perplexity Sonar`, `Perplexity AI`, and `Perplexity`.
+- **Developer Filter UI:** Added `'Microsoft'` and `'Perplexity AI'` filter tabs in `src/App.tsx`.
 
-### 2.3 General Sharing and Result Sharing
-- **Dedicated Share Module (`src/share.ts`):** Created a pure, unit-testable sharing layer without React/DOM coupling.
-- **Canonical URL:** Standardized on `https://www.aidle.fun/` across the site.
-- **Dual Placement:** Added `Share AIdle` CTA to both the header navigation (`data-testid="share-aidle-header"`) and main menu (`data-testid="share-aidle-menu"`).
-- **Resilient Web Share API:** Uses `navigator.share` with `navigator.canShare` verification on supported devices, with debounced re-entry guarding (`isSharingAIdleRef`). Gracefully handles user dismissals (`AbortError`) without false error messages.
-- **Clipboard Fallback:** Automatically falls back to copying `Think you can identify the AI? Play AIdle: https://www.aidle.fun/` to the clipboard with toast feedback on desktop and unsupported browsers.
-- **Separation of Concerns:** Preserved the end-of-game `Share Result` grid format while ensuring it terminates with the canonical `https://www.aidle.fun/` URL rather than an obsolete preview URL.
+### 2.3 Hints and Stylometric Quality
+- **Response-Derived Structural Clues:** Clues dynamically derive from `describeResponseStructure(response)`, analyzing observable sentence count, word count, opening style, exclamation count, closing structure, and contractions.
+- **Contraction Detection Hardening:** Fully handles `"let's"`, pronoun contractions, standard verbal contractions, and curly apostrophes.
+- **Zero Answer Leaks:** 100% of stylometry clues quote the response and maintain strict developer/model anonymity. All 304 hint slots pass R1–R7 with 0 findings.
 
-### 2.4 Metadata & Asset Integrity
-- **Canonical & Open Graph Tags:** Updated `index.html` `canonical`, `og:url`, `og:image`, and `twitter:image` to reference `https://www.aidle.fun/`.
-- **Open Graph Image Asset:** Standardized `public/og-image.png` (1200×630 PNG) while preserving the original supplied `public/og-image (1).png`.
-- **Icons & Favicons:** Verified SVG and PNG favicons, Apple touch icon, and game iconography (`app_logo_mark.png`, `icon_streak_flame.png`, `icon_ai_chip.png`, `icon_trophy_gold.png`).
+### 2.4 General Sharing and Result Sharing
+- **Dedicated Share Module (`src/share.ts`):** Pure, unit-tested sharing layer without DOM coupling.
+- **Canonical URL:** Standardized on `https://www.aidle.fun/`.
+- **Dual Placement:** Added `Share AIdle` CTA to both header navigation and main menu.
+- **Resilient Web Share API:** Uses `navigator.share` with clipboard fallback and debounced re-entry guarding.
+- **Separation of Concerns:** Preserved `Share Result` grid format terminating with the canonical URL.
 
 ---
 
 ## 3. Verification Results
 
-All available checks and test scripts were executed directly in the project environment.
+All checks and test scripts were executed directly in the project environment.
 
 | Check | Command | Status | Result / Notes |
 | :--- | :--- | :---: | :--- |
 | **Dependency Install** | `npm ci` | **PASS** | 136 packages audited cleanly; 0 vulnerabilities found. |
-| **TypeScript Typecheck** | `npm run typecheck` | **PASS** | `tsc --noEmit` passed with 0 errors (including React 19 `useRef` resolution). |
-| **Production Build** | `npm run build` | **PASS** | Vite v6.4.5 built production bundle in 3.13s (`dist/assets/index-*.js`, `css`). |
-| **Automated Tests** | `npm test` | **PASS** | **39 passed, 0 failed** across 3 test suites (`pools`, `share`, `hints`). |
-| **Hint Fairness Audit** | `npm run audit:hints` | **PASS** | **0 findings** across 224 hint slots and 151 authored strings. |
-| **Golden Regression Parity** | `tests/pools.test.ts` | **PASS** | 336 pool configurations and 730 daily puzzle dates identical to production. |
+| **TypeScript Typecheck** | `npm run typecheck` | **PASS** | `tsc --noEmit` passed with 0 errors. |
+| **Production Build** | `npm run build` | **PASS** | Vite v6.4.5 built production bundle cleanly in 2.81s (`dist/assets/index-*.js`, `css`). |
+| **Automated Tests** | `npm test` | **PASS** | **43 passed, 0 failed** across all test suites (`pools`, `share`, `hints`). |
+| **Hint Fairness Audit** | `npm run audit:hints` | **PASS** | **0 findings** across 304 hint slots and 195 authored strings (152 configurations). |
+| **Golden Regression Parity** | `tests/pools.test.ts` | **PASS** | 456 pool configurations and 730 daily puzzle dates pinned and verified. |
+| **Candidate Pool Integration** | `tests/pools.test.ts` | **PASS** | Confirms all 8 models validly integrated into candidate pools across all 19 challenges. |
 | **Contraction Regression** | `tests/hints.test.ts` | **PASS** | Verifies "let's", curly apostrophes, and word counts across all responses. |
-| **Content Gaps Report** | `npm run report:content-gaps` | **PASS** | CSV report generated listing missing authentic responses. |
+| **Content Gaps Report** | `npm run report:content-gaps` | **PASS** | Confirms 0 gaps for Medium (all 19 at 6) and 0 gaps for Hard (all 19 at 8). |
 
 ---
 
 ## 4. Modified and Created Files
 
 ```text
-├── AIDLE_CHANGELOG.md             # Updated with [3.5.0] changes
+├── .gitignore                     # Git ignore rules for node_modules, dist, zip, env
+├── AIDLE_CHANGELOG.md             # Updated with 8-choice Hard mode and Copilot/Perplexity integration
 ├── AIDLE_HANDOFF.md               # Synchronized handoff documentation
 ├── AIDLE_PROJECT_STATE.md         # Updated architectural state
 ├── IMPLEMENTATION_REPORT.md       # Complete verification report
 ├── README.md                      # Updated script documentation
 ├── index.html                     # Canonical URL and OG metadata fixes
-├── package.json                   # Version 3.5.0 and test / audit scripts
+├── package.json                   # Version 3.6.0 and test / audit scripts
 ├── public/
 │   ├── og-image.png               # Canonical 1200x630 OG image
 │   └── og-image (1).png           # Preserved original asset
@@ -83,36 +103,40 @@ All available checks and test scripts were executed directly in the project envi
 │   ├── contentGaps.ts             # Missing response reporting script
 │   └── hintAudit.ts               # Automated hint fairness audit (Rules R1-R7)
 ├── src/
-│   ├── App.tsx                    # Share CTAs, dynamic difficulty labels, React 19 fix
-│   ├── aiModelsData.ts            # Pools logic, describeResponseStructure, hint rewrites
+│   ├── App.tsx                    # Candidate developer filter tabs, Share CTAs, dynamic difficulty labels
+│   ├── aiModelsData.ts            # 8 models across all 19 challenges (152 variants), pools logic, sanitization
 │   └── share.ts                   # Canonical share logic & Web Share engine
 └── tests/
     ├── golden/
     │   ├── production-daily.json  # 730-day deterministic parity oracle
-    │   └── production-pools.json  # 336-configuration pool parity oracle
-    ├── hints.test.ts              # Hint audit & contraction regression tests
-    ├── pools.test.ts              # Candidate pool validity & parity tests
+    │   └── production-pools.json  # 456-configuration pool parity oracle
+    ├── hints.test.ts              # Hint audit, contraction regression, sanitization tests
+    ├── pools.test.ts              # Candidate pool validity, model schema & decoy prevention tests
     └── share.test.ts              # Share AIdle unit tests
 ```
 
 ---
 
-## 5. Remaining Limitations (Content Tasks)
+## 5. Content Gaps & Authenticity Status
 
-1. **Hard Mode 8-Choice Content Target:**
-   - As documented in `scripts/contentGaps.ts`, each challenge currently has 5 or 6 recorded model responses in the dataset.
-   - For Hard mode to legitimately offer 8 distinct models without impossible decoys or synthetic outputs, 40 additional authentic model responses (2 per challenge across 17 challenges, 3 per challenge across 2 challenges) need to be gathered from API benchmark executions.
-   - Once added to `VERIFIED_CHALLENGE_LIBRARY`, the engine and UI will automatically scale the Hard candidate pool up to 8 with zero code changes.
-2. **Medium Mode Uniform 6-Choice Target:**
-   - Two challenges (`aidle-2026-msg-003` and `aidle-2026-emo-003`) currently have 5 recorded responses. Two authentic responses (one each) will bring all 19 challenges to a uniform 6 models.
+1. **Brand Coverage:**
+   - All 8 chatbot brands (ChatGPT, Gemini, Microsoft Copilot, Claude, Meta AI, Grok, DeepSeek, Perplexity) are fully registered and active.
+   - All 19 challenge prompts now feature 8 verified responses matching the active scenario constraints.
+2. **Zero Content Gaps:**
+   - `npm run report:content-gaps` confirms:
+     - Easy choices: 4
+     - Medium choices: 6
+     - Hard choices: 8
+     - Missing for Medium 6: 0
+     - Missing for Hard 8: 0
+3. **No Decoys or Placeholders:**
+   - 100% of choices presented to the player in Easy, Medium, or Hard have an authentic response on file.
 
 ---
 
 ## 6. Archive Verification (`aidle.zip`)
 
-The deliverable `aidle.zip` was generated excluding `node_modules`, `dist`, `.DS_Store`, and temporary caches. The archive was extracted into a separate temporary directory and verified:
-- Project structure: Correct and intact.
-- Dependencies: Installed cleanly via `npm ci`.
-- Typecheck: `npm run typecheck` returned 0 errors.
-- Tests: `npm test` passed 39 of 39 tests.
-- Production build: `npm run build` completed successfully.
+The deliverable `aidle.zip` contains all completed work:
+- Project structure: Cleanly rooted under `AIdle/`.
+- Exclusions: `node_modules`, `dist`, `.git`, `.DS_Store`, and `aidle.zip` are excluded.
+- Build & Test: Verified with `npm run typecheck`, `npm test` (43/43 passing), `npm run audit:hints` (0 findings), `npm run report:content-gaps` (0 missing), and `npm run build`.

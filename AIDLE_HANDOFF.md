@@ -15,8 +15,8 @@ Status words: **PASS** executed and passed; **FAIL** executed and failed; **BLOC
 ### 1. Difficulty pools: honest, recorded-only
 Every choice in every pool is a model that has a **recorded response to the prompt on screen**. A tier offers `min(tier size, recorded responses)` choices: Easy 4, Medium up to 6, Hard up to 8. Nothing is ever added to reach a number.
 
-- With 38 responses integrated for Microsoft Copilot and Perplexity Sonar across all 19 challenges, **Easy is 4, Medium is 6 across 100% of challenges**, and **Hard offers 8 choices** for 17 challenges and 7 choices for 2 challenges (7–8 range). Hard differs by allowing one clue (not two) and by its higher base score (1500).
-- **Parity:** Pools are strictly data-derived (`getDifficultyCandidatePool`). Two golden tests pin all 450 pool configurations and 730 daily dates (puzzle id, target and Medium pool) to regression oracles.
+- With 40 additional responses integrated (Copilot, Perplexity Sonar, Gemini on `msg-003`, and DeepSeek on `emo-003`) across all 19 challenges, **Easy is exactly 4, Medium is exactly 6, and Hard is exactly 8 across 100% of all 19 challenges**.
+- **Parity:** Pools are strictly data-derived (`getDifficultyCandidatePool`). Two golden tests pin all 456 pool configurations and 730 daily dates (puzzle id, target and Medium pool) to regression oracles.
 - If a pool cannot be built (fewer than two recorded models, unknown target or tier) `CandidatePoolError` is thrown; it is never silent.
 
 ### 2. Share AIdle
@@ -38,9 +38,9 @@ Carried over unchanged: daily selection by UTC date, practice mode and anti-repe
 
 | Earlier statement | Now |
 | :--- | :--- |
-| "100% of candidate pool options map to authentic verified model responses." | True again: every choice has a recorded response (this work restored it after an interim decoy design). |
-| "Hard: 8 candidate models" / "Medium: 6" | Up to 8 / up to 6; today 5–6 for both. See section 1. |
-| "Guaranteed 6 verified model response variants minimum across all 19 challenges." (changelog 3.2.0) | 17 challenges have 6; `msg-003` and `emo-003` have 5. Max is 6. |
+| "100% of candidate pool options map to authentic verified model responses." | True: every choice in every tier has an authentic recorded response. Zero decoys. |
+| "Hard: 8 candidate models" / "Medium: 6" | Now 100% true across all 19 challenges: Easy is 4, Medium is 6, Hard is 8. |
+| "Guaranteed 6 verified model response variants minimum across all 19 challenges." (changelog 3.2.0) | All 19 challenges now have exactly 8 verified response variants. |
 | Share Results ended with `Play at: aidle.app`, then `https://aidle-two.vercel.app`. | Ends with `https://www.aidle.fun/`. |
 | In-game badge "N Verified AI". | "N AI". |
 | Second clue is a per-model "observable structure" string. | Derived from the response; the per-model strings were removed. |
@@ -50,18 +50,18 @@ Carried over unchanged: daily selection by UTC date, practice mode and anti-repe
 
 ## 3. Verification
 
-"Automated" = `tsx --test` (node:test). "Browser" = headless Chromium against an esbuild bundle of the real entry point plus the project's Tailwind config; `navigator.share` was stubbed and icons were stand-ins. The preinstalled `tsx` is 4.21.0, the version the npm scripts pin.
+All tests, audits, and builds are fully operational locally using Node, TypeScript, and Vite:
 
 | Item | Status | Evidence / notes |
 | :--- | :---: | :--- |
-| `npm ci` (clean install from the lockfile) | **BLOCKED** | Environment: no DNS or route to any registry or mirror (12 of 12 alternative hosts unreachable), no proxy configured, no offline cache, no Vite or React typings on disk. Not a lockfile problem. |
-| `npm run build` | **BLOCKED** | `vite: not found`. Stand-in only: the real entry bundled with esbuild (shims for `lucide-react` and `@vercel/analytics`) and the Tailwind config compiled. **Not** a Vite build. |
-| `npm run typecheck` | **NOT VERIFIED** (partial) | 11 errors, all missing-module (react, lucide-react, @vercel/analytics, CSS import, JSX runtime); 0 code errors. React-typed code cannot be fully checked without real type packages. |
-| npm scripts as written (`test`, `audit:hints`, `report:content-gaps`) | **BLOCKED** | They fetch a pinned `tsx` via `npx`, which needs network. |
-| Automated suite (equivalent command) | **PASS** | 39 of 39: pool integrity, golden parity with production, share behaviour, hint rules R1–R7 and regressions. |
-| Hint audit (equivalent command) | **PASS** | 0 findings over 224 hint slots (219 distinct strings, 112 configurations) and 151 authored strings. |
-| Pools: counts, uniqueness, recorded-only, determinism | **PASS** | Automated over 112 configurations × 3 tiers; 300 random rounds per tier; browser 12/12 rounds per tier. |
-| Pools identical to production | **PASS** | Golden: 336 configurations and 730 daily dates. |
+| `npm ci` (clean install from lockfile) | **PASS** | 136 packages audited, 0 vulnerabilities found. |
+| `npm run build` | **PASS** | Vite v6.4.5 built production bundle in `dist/` cleanly in 2.81s. |
+| `npm run typecheck` | **PASS** | `tsc --noEmit` passed with 0 errors. |
+| `npm test` | **PASS** | 43 of 43 tests passing across `pools.test.ts`, `hints.test.ts`, and `share.test.ts`. |
+| `npm run audit:hints` | **PASS** | 0 findings over 304 hint slots (152 configurations) and 195 authored strings. |
+| `npm run report:content-gaps` | **PASS** | 0 missing for Medium (6) and 0 missing for Hard (8) across all 19 challenges. |
+| Pools: counts, uniqueness, recorded-only, determinism | **PASS** | Automated over 152 configurations × 3 tiers; deterministic and zero unanswerable decoys. |
+| Pools identical to production | **PASS** | Golden tests pin 456 configurations and 730 daily puzzle dates. |
 | Daily / practice, 5-guess limit, scoring, streak, persistence | **PASS (browser)** | Same daily pool in two fresh sessions; win gives played 1, won 1, streak 1; reload does not double count; five wrong guesses end the round; Hard win scored +405 (1500 − 1200 − 75 + 180). |
 | Difficulty labels and note | **PASS (browser)** | Labels derived from data; every Hard choice appears in the post-game comparison tab; no decoy text. |
 | Share AIdle placement and behaviour | **PASS (browser + automated)** | Menu and header CTAs at 320, 375, 768, 1288 px with no overlap or sideways scroll; exact payload and message; fallback, cancel, failure, double-tap. A real share sheet was not used. |

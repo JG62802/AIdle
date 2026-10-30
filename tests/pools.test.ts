@@ -106,7 +106,7 @@ test('pools are deterministic', () => {
   }
 });
 
-test('GOLDEN: every pool is identical to production (Easy, Medium and Hard, 450 configurations)', () => {
+test('GOLDEN: every pool is identical to production (Easy, Medium and Hard, 456 configurations)', () => {
   const golden: Record<string, string[]> = json('production-pools.json');
   let n = 0;
   for (const {challenge, variant, puzzle} of allRounds()) {

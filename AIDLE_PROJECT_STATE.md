@@ -38,9 +38,9 @@ Every scenario in the library has undergone a rigorous authenticity audit, mappi
    - In-game quick category chips directly on post-game cards allow frictionless switching between communication domains.
    - Difficulty tiers with candidate pool scaling:
      - **Easy:** 4 candidate models (1 free unlocked clue, 500 base score).
-     - **Medium:** up to 6 candidate models (0 free clues, 1000 base score).
-     - **Hard:** up to 8 candidate models (0 free clues, 1500 base score, one clue allowed).
-     - Pool rule (`getDifficultyCandidatePool`): every choice is a model with a recorded response to the prompt, and a tier offers `min(tier size, recorded responses)` choices. With Microsoft Copilot and Perplexity Sonar responses integrated across all 19 challenges, Easy is 4, Medium is 6 across 100% of challenges, and Hard offers up to 8 (7–8 range). Nothing is added to reach the nominal size. If a pool cannot be built, a `CandidatePoolError` is thrown.
+     - **Medium:** 6 candidate models (0 free clues, 1000 base score).
+     - **Hard:** 8 candidate models (0 free clues, 1500 base score, one clue allowed).
+     - Pool rule (`getDifficultyCandidatePool`): every choice is a model with a recorded response to the prompt, and a tier offers `min(tier size, recorded responses)` choices. With all 8 models (including Microsoft Copilot and Perplexity Sonar) verified and recorded across all 19 challenges, Easy is exactly 4, Medium is exactly 6, and Hard is exactly 8 across 100% of challenges. Nothing is added to reach the nominal size, and zero unanswerable decoys exist. If a pool cannot be built, a `CandidatePoolError` is thrown.
    - Completely isolated: Practice rounds record separate training stats (`practicePlayed`, `practiceWon`) and never overwrite daily streaks or submit scores to the competitive daily leaderboard.
 
 3. **Wordle-Style Deduction Ledger:**

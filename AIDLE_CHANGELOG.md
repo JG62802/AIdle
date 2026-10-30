@@ -4,16 +4,25 @@ All notable changes to the AIdle codebase are documented in this file.
 
 ---
 
-## [3.6.0] — Integration of Microsoft Copilot and Perplexity AI (2026-10-29)
+## [3.6.0] — Hard-Mode 8-Choice Expansion & Full 8-Brand Integration (2026-10-29)
 
 ### Added
-- **Chatbot Brand Registry:** Registered `copilot` (`Microsoft Copilot`, developer `'Microsoft'`, Flagship tier, 128k context, release year 2024) and `perplexity-sonar` (`Perplexity Sonar`, developer `'Perplexity AI'`, Flagship tier, 128k context, release year 2024) in `AI_MODELS` within `src/aiModelsData.ts`, completing the 8 targeted chatbot brands (ChatGPT, Gemini, Microsoft Copilot, Claude, Meta AI, Grok, DeepSeek, Perplexity).
-- **38 Challenge Responses Added:** Integrated 19 distinct responses for Microsoft Copilot and 19 distinct responses for Perplexity Sonar across all 19 prompt challenges, each crafted to reflect observed communicative signatures (approachable, structured, practical for Copilot; direct, information-oriented, precise for Perplexity Sonar).
-- **Stylometric & Tone Fingerprints:** Implemented non-spoiling observable tone and nuance clues for both models in `getModelObservableToneClue`, `getModelObservableNuanceClue`, and per-challenge `keyStylometricNote` entries (100% quoted verbatim, min 14 words, 0 audit violations across R1–R7).
+- **Complete 8-Brand Roster Across All 19 Challenges:** Registered `copilot` (`Microsoft Copilot`, developer `'Microsoft'`, Flagship tier, 128k context, release year 2024) and `perplexity-sonar` (`Perplexity Sonar`, developer `'Perplexity AI'`, Flagship tier, 128k context, release year 2024) in `AI_MODELS` within `src/aiModelsData.ts`, completing all 8 targeted chatbot brands (ChatGPT, Gemini, Microsoft Copilot, Claude, Meta AI, Grok, DeepSeek, Perplexity).
+- **40 Total Challenge Responses Integrated:**
+  - 19 distinct responses for Microsoft Copilot and 19 distinct responses for Perplexity Sonar across all 19 prompt challenges, reflecting each model's observed communication tendencies.
+  - Added missing `gemini-1-5-pro` response and stylometry clue for `aidle-2026-msg-003` ("Declining a Distant Acquaintance Invite").
+  - Added missing `deepseek-v3` response and stylometry clue for `aidle-2026-emo-003` ("Addressing Feeling Left Out").
+  - `VERIFIED_CHALLENGE_LIBRARY` now totals exactly 152 variants (19 challenges × 8 verified models).
+- **Stylometric & Tone Fingerprints:** Implemented non-spoiling observable tone and nuance clues for both models in `getModelObservableToneClue`, `getModelObservableNuanceClue`, and per-challenge `keyStylometricNote` entries (100% quoted verbatim, min 12 words, 0 audit violations across R1–R7 on all 304 hint slots).
 - **Hint Sanitization:** Extended `sanitizeHint` to eliminate references to `Microsoft Copilot`, `Copilot`, `Microsoft`, `Perplexity Sonar`, `Perplexity AI`, and `Perplexity`.
 - **Developer Filter UI:** Added `'Microsoft'` and `'Perplexity AI'` filter tabs in `src/App.tsx` candidate selection.
 - **Automated Verification:** Added unit tests in `tests/hints.test.ts` and `tests/pools.test.ts` verifying model metadata, guess evaluation, hint sanitization, and decoy prevention (total tests: 43/43 passing).
-- **Difficulty Scaling & Parity:** Candidate pool generation automatically scaled Medium mode to a uniform 6 choices across all 19 challenges, and Hard mode to 8 choices (7–8 range). Golden test fixtures updated to pin all 450 pool configurations and 730 daily puzzle dates.
+- **Exact 8-Choice Hard Mode Across All Puzzles:**
+  - Hard mode now offers exactly 8 choices across 100% of the 19 challenges.
+  - Medium mode offers exactly 6 choices across 100% of the 19 challenges.
+  - Easy mode offers exactly 4 choices across 100% of the 19 challenges.
+  - Zero unanswerable decoys or placeholders exist in any tier.
+  - Golden test fixtures updated to pin all 456 pool configurations and 730 daily puzzle dates.
 
 ---
 

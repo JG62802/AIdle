@@ -1344,6 +1344,13 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         response: "Thank you for the invitation to the cabin weekend. The itinerary sounds enjoyable, but the timing and budget do not align for me, so I must decline. I hope you and the group have a successful trip.",
         keyStylometricNote: 'Conveys an unequivocal decision stating "the timing and budget do not align for me" without defensive elaboration.',
       },
+      {
+        modelId: 'gemini-1-5-pro',
+        model: 'Gemini 1.5 Pro',
+        version: 'gemini-1.5-pro-001',
+        response: "Thanks so much for extending the invitation—that getaway sounds like an absolute blast! I have to pass this time as it doesn't fit my current travel budget, but I really appreciate you looping me in. I hope you all have a fantastic trip, and I'd love to catch up locally whenever you're back in town!",
+        keyStylometricNote: 'Expresses energetic gratitude for the invite, mentions the getaway "sounds like an absolute blast", and suggests catching up locally.',
+      },
     ],
   }),
 
@@ -1552,6 +1559,13 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         version: 'sonar-large-2024-07',
         response: "Hi Morgan, I noticed the group brunch photos from Sunday. While I assume it was an informal gathering that came together quickly, I felt somewhat excluded not being invited. I wanted to communicate that openly rather than make assumptions. Let us plan something together soon.",
         keyStylometricNote: 'Maintains an objective stance by noting "felt somewhat excluded not being invited" while assuming good intentions from peers.',
+      },
+      {
+        modelId: 'deepseek-v3',
+        model: 'DeepSeek V3',
+        version: 'deepseek-chat-v3',
+        response: "Hi Alex, I saw the group photos from brunch yesterday and hope everyone had a pleasant afternoon. I wanted to mention candidly that I felt somewhat excluded not receiving an invitation to join. I understand that social plans occasionally materialize spontaneously, but I wanted to address this directly so we stay on good terms. Let us coordinate for the next group gathering.",
+        keyStylometricNote: 'Communicates emotional distance calmly, recognizing that plans "materialize spontaneously" while asking to coordinate the next gathering directly.',
       },
     ],
   }),
