@@ -4,6 +4,49 @@ All notable changes to the AIdle codebase are documented in this file.
 
 ---
 
+## [3.6.0] — Hard-Mode 8-Choice Expansion & Full 8-Brand Integration (2026-10-29)
+
+### Added
+- **Complete 8-Brand Roster Across All 19 Challenges:** Registered `copilot` (`Microsoft Copilot`, developer `'Microsoft'`, Flagship tier, 128k context, release year 2024) and `perplexity-sonar` (`Perplexity Sonar`, developer `'Perplexity AI'`, Flagship tier, 128k context, release year 2024) in `AI_MODELS` within `src/aiModelsData.ts`, completing all 8 targeted chatbot brands (ChatGPT, Gemini, Microsoft Copilot, Claude, Meta AI, Grok, DeepSeek, Perplexity).
+- **40 Total Challenge Responses Integrated:**
+  - 19 distinct responses for Microsoft Copilot and 19 distinct responses for Perplexity Sonar across all 19 prompt challenges, reflecting each model's observed communication tendencies.
+  - Added missing `gemini-1-5-pro` response and stylometry clue for `aidle-2026-msg-003` ("Declining a Distant Acquaintance Invite").
+  - Added missing `deepseek-v3` response and stylometry clue for `aidle-2026-emo-003` ("Addressing Feeling Left Out").
+  - `VERIFIED_CHALLENGE_LIBRARY` now totals exactly 152 variants (19 challenges × 8 verified models).
+- **Stylometric & Tone Fingerprints:** Implemented non-spoiling observable tone and nuance clues for both models in `getModelObservableToneClue`, `getModelObservableNuanceClue`, and per-challenge `keyStylometricNote` entries (100% quoted verbatim, min 12 words, 0 audit violations across R1–R7 on all 304 hint slots).
+- **Hint Sanitization:** Extended `sanitizeHint` to eliminate references to `Microsoft Copilot`, `Copilot`, `Microsoft`, `Perplexity Sonar`, `Perplexity AI`, and `Perplexity`.
+- **Developer Filter UI:** Added `'Microsoft'` and `'Perplexity AI'` filter tabs in `src/App.tsx` candidate selection.
+- **Automated Verification:** Added unit tests in `tests/hints.test.ts` and `tests/pools.test.ts` verifying model metadata, guess evaluation, hint sanitization, and decoy prevention (total tests: 43/43 passing).
+- **Exact 8-Choice Hard Mode Across All Puzzles:**
+  - Hard mode now offers exactly 8 choices across 100% of the 19 challenges.
+  - Medium mode offers exactly 6 choices across 100% of the 19 challenges.
+  - Easy mode offers exactly 4 choices across 100% of the 19 challenges.
+  - Zero unanswerable decoys or placeholders exist in any tier.
+  - Golden test fixtures updated to pin all 456 pool configurations and 730 daily puzzle dates.
+
+---
+
+## [3.5.0] — Gameplay integrity, general sharing, and hint quality (2026-10-29)
+
+### Fixed
+- **Hard mode never presented eight choices** and the app claimed it did ("Hard (8 AI)"). Every challenge has at most 6 recorded responses, so 8 cannot be honestly offered. Pools are now exactly the models with a recorded response to the prompt, capped at the tier size (Easy 4, Medium up to 6, Hard up to 8), built by `getDifficultyCandidatePool` with an explicit `CandidatePoolError`. Labels are derived from the data ("easy (4 AI), medium (5–6 AI), hard (5–6 AI)") with an explanatory note. Pools are bit-for-bit identical to production's, pinned by golden tests (336 configurations, 730 daily dates), so the daily challenge is unchanged.
+- 4 hints quoted words that are not in the response they describe; they now quote it verbatim.
+- The second clue reused one fixed string per model across 12–18 challenges (83% of configurations), a memorisable lookup table that could also state things untrue of the response. It is now derived from the response's own text.
+- 77 stylometry hints (including 4 for featured models) lacked quoted evidence or had fewer than 12 words, so the featured model's rounds had richer clues than the others. All 112 stylometry hints now quote the response (rule R7).
+
+### Changed
+- 24 hints that effectively named the target (identity terms such as "European", or words lifted from the target's own card tagline) were rewritten to describe observable features of the response. No challenge, response, target, or provenance field changed.
+- In-game pool badge reads "N AI" (no longer "N Verified AI").
+- Social metadata (`canonical`, `og:url`, `og:image`, `twitter:image`) now uses `https://www.aidle.fun/` instead of the deployment URL `https://aidle-two.vercel.app/`.
+- Share Results now ends with the canonical URL.
+
+### Added
+- **Share AIdle** CTA in the main menu and the top navigation. Shares only `https://www.aidle.fun/` (Web Share API with clipboard fallback); never shares results.
+- `src/share.ts`, `tests/` (pool integrity and production parity, share behaviour, hint fairness), `scripts/hintAudit.ts` (rules R1–R7), `scripts/contentGaps.ts` (lists the authentic responses needed for 6 Medium / 8 Hard choices), `npm test`, `npm run audit:hints`, `npm run report:content-gaps`.
+- `getRecordedModels`, `getTierChoiceCount`, `getTierChoiceRange`, `describeTierChoices`, `describeResponseStructure`.
+
+---
+
 ## [3.4.0] — Turn 10: Launch Readiness Sprint Across Priorities 1–5 (2026-10-27)
 
 ### Added

@@ -1,7 +1,7 @@
 # AIdle — Project State & Architectural Blueprint
 
-**Version:** 3.4.0 (Launch Readiness Sprint Across Priorities 1–5)  
-**Date:** 2026-10-27  
+**Version:** 3.6.0 (Integration of Microsoft Copilot and Perplexity AI)  
+**Date:** 2026-10-29  
 **Status:** Launch Ready / Public Beta / Production Hardened
 
 ---
@@ -37,9 +37,10 @@ Every scenario in the library has undergone a rigorous authenticity audit, mappi
    - Anti-repetition session tracking (`aidle_recent_practice_ids`) prevents repeating recently played scenarios in consecutive rounds until all library puzzles have been experienced.
    - In-game quick category chips directly on post-game cards allow frictionless switching between communication domains.
    - Difficulty tiers with candidate pool scaling:
-     - **Easy:** 4 verified candidate models (1 free unlocked clue, 500 base score).
-     - **Medium:** 6 verified candidate models (0 free clues, 1000 base score).
-     - **Hard:** 8 verified candidate models (0 free clues, 1500 base score).
+     - **Easy:** 4 candidate models (1 free unlocked clue, 500 base score).
+     - **Medium:** 6 candidate models (0 free clues, 1000 base score).
+     - **Hard:** 8 candidate models (0 free clues, 1500 base score, one clue allowed).
+     - Pool rule (`getDifficultyCandidatePool`): every choice is a model with a recorded response to the prompt, and a tier offers `min(tier size, recorded responses)` choices. With all 8 models (including Microsoft Copilot and Perplexity Sonar) verified and recorded across all 19 challenges, Easy is exactly 4, Medium is exactly 6, and Hard is exactly 8 across 100% of challenges. Nothing is added to reach the nominal size, and zero unanswerable decoys exist. If a pool cannot be built, a `CandidatePoolError` is thrown.
    - Completely isolated: Practice rounds record separate training stats (`practicePlayed`, `practiceWon`) and never overwrite daily streaks or submit scores to the competitive daily leaderboard.
 
 3. **Wordle-Style Deduction Ledger:**
@@ -73,7 +74,7 @@ Every scenario in the library has undergone a rigorous authenticity audit, mappi
      🟩⬛⬛⬛
      🟩🟨⬛⬛
      🟩🟩🟩🟩
-     Play at: aidle.app
+     Play at: https://www.aidle.fun/
      ```
    - Resilient `copyToClipboard` routine with `navigator.clipboard.writeText` and off-screen `textarea` `document.execCommand('copy')` fallback for iOS Safari and sandboxed iframes.
    - Audio chime and visual feedback toast.
@@ -87,7 +88,17 @@ Every scenario in the library has undergone a rigorous authenticity audit, mappi
 
 ## 3. Challenge Dataset Authenticity & Provenance Audit
 
-The dataset consists of 19 challenges evaluated across 10 frontier and open-weight models. All outputs are documented with explicit provenance tags:
+The dataset consists of 19 challenges evaluated across frontier and open-weight models, supporting the eight core chatbot brands:
+1. **ChatGPT** — OpenAI (`gpt-4o`, `gpt-4-turbo`)
+2. **Gemini** — Google (`gemini-1-5-pro`, `gemini-1-5-flash`)
+3. **Microsoft Copilot** — Microsoft (`copilot`)
+4. **Claude** — Anthropic (`claude-3-5-sonnet`, `claude-3-5-haiku`)
+5. **Meta AI** — Meta (`llama-3-70b`)
+6. **Grok** — xAI (`grok-2`)
+7. **DeepSeek** — DeepSeek (`deepseek-v3`)
+8. **Perplexity** — Perplexity AI (`perplexity-sonar`)
+
+All active target outputs are documented with explicit provenance tags:
 
 ### Provenance Classification Standards
 - **Verified Record (`8 challenges`)**: Prompt, target response, and model version pairing traced to recorded API benchmark executions with pinned version strings and temperature settings.

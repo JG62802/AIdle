@@ -1,13 +1,16 @@
 {
   "name": "aidle",
   "private": true,
-  "version": "3.4.0",
+  "version": "3.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "npx --yes tsx@4.21.0 --test tests/*.test.ts",
+    "audit:hints": "npx --yes tsx@4.21.0 scripts/hintAudit.ts",
+    "report:content-gaps": "npx --yes tsx@4.21.0 scripts/contentGaps.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

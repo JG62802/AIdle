@@ -8,6 +8,11 @@ Daily game: read an AI-written response and guess which model wrote it in 5 atte
     npm run typecheck
     npm run build && npm run preview
 
+## Tests
+    npm test              # pool integrity, share behaviour, hint fairness (node:test via tsx)
+    npm run audit:hints   # prints the hint fairness audit report (exit code 1 on findings)
+    npm run report:content-gaps   # CSV of the authentic responses still missing per challenge
+
 ## Styling
 The UI is styled with Tailwind CSS v3 utility classes in `src/App.tsx` and `src/utils/*`.
 Tailwind is wired in via `tailwind.config.js`, `postcss.config.js` and `src/index.css`
