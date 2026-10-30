@@ -2,7 +2,7 @@ export interface AIModel {
   id: string;
   name: string;
   version: string;
-  developer: 'OpenAI' | 'Anthropic' | 'Google' | 'Meta' | 'DeepSeek' | 'Mistral' | 'xAI' | 'Cohere';
+  developer: 'OpenAI' | 'Anthropic' | 'Google' | 'Meta' | 'DeepSeek' | 'Mistral' | 'xAI' | 'Cohere' | 'Microsoft' | 'Perplexity AI';
   tier: 'Flagship' | 'Reasoning' | 'Fast' | 'Open-Weight';
   releaseYear: number;
   contextWindow: string;
@@ -209,6 +209,30 @@ export const AI_MODELS: AIModel[] = [
     tagline: 'Witty, frank, and conversational',
     signatureStyle: 'Direct conversational delivery, casual idioms, slight irreverence or playful frankness.',
   },
+  {
+    id: 'copilot',
+    name: 'Microsoft Copilot',
+    version: 'copilot-2024-03',
+    developer: 'Microsoft',
+    tier: 'Flagship',
+    releaseYear: 2024,
+    contextWindow: '128k',
+    contextSizeNum: 128,
+    tagline: 'Helpful, balanced, and assistive',
+    signatureStyle: 'Supportive approachable phrasing, gently structured guidance, and warm accessible helpfulness.',
+  },
+  {
+    id: 'perplexity-sonar',
+    name: 'Perplexity Sonar',
+    version: 'sonar-large-2024-07',
+    developer: 'Perplexity AI',
+    tier: 'Flagship',
+    releaseYear: 2024,
+    contextWindow: '128k',
+    contextSizeNum: 128,
+    tagline: 'Informative, precise, and citation-ready',
+    signatureStyle: 'Informative clarity, measured phrasing, concise delivery with a reference-oriented mindset.',
+  },
 ];
 
 /**
@@ -236,39 +260,63 @@ export function getModelObservableToneClue(modelId: string): string {
       return 'Notice the formal sentence structure, comprehensive explanatory flow, and careful polite qualifiers.';
     case 'grok-2':
       return 'Notice the witty, frank conversational delivery and confident colloquial banter.';
+    case 'copilot':
+      return 'Notice the supportive, approachable phrasing and gently structured helpful guidance.';
+    case 'perplexity-sonar':
+      return 'Notice the informative, measured phrasing and concise delivery with precise clarity.';
     default:
       return 'Notice the distinctive stylistic cadence and intentional choice of phrasing.';
   }
 }
 
 /**
- * Returns observable structure & cadence clues without model or developer spoilers.
+ * Describes the structure of a recorded response using only objective, countable facts taken from
+ * its own text (sentence count, word count, opening, punctuation, closing). It names no
+ * model and makes no claim about how any model behaves in general.
+ *
+ * This replaces the former per-model structure strings. Those were identical in every challenge
+ * for a given model (so a player could memorise "this exact clue = that model") and could state
+ * things that were not true of the response in front of the player.
  */
-export function getModelObservableStructureClue(modelId: string): string {
-  switch (modelId) {
-    case 'gpt-4o':
-      return 'Observe the balanced three-part structure: positive affirmation, clear boundary preference, and a cooperative forward-looking conclusion.';
-    case 'claude-3-5-sonnet':
-      return 'Observe the smooth conversational pacing: includes unforced personal callbacks and low-pressure disclaimers that put the reader at ease.';
-    case 'gemini-1-5-pro':
-      return 'Observe the actionable structure: pairs immediate contextual awareness with direct, pragmatic steps forward.';
-    case 'gemini-1-5-flash':
-      return 'Observe the brisk, economical cadence: delivers key information directly with minimal transitional padding.';
-    case 'llama-3-70b':
-      return 'Observe the grounded domestic syntax: relies on familiar spoken idioms and low-friction, casual clause progression.';
-    case 'mistral-large':
-      return 'Observe the razor-sharp brevity: delivers clear ownership or notification in concise sentences with zero apologetic hedging.';
-    case 'deepseek-v3':
-      return 'Observe the orderly syntactic boundaries: balances formal clauses methodically with neutral, procedural clarity.';
-    case 'claude-3-5-haiku':
-      return 'Observe the punchy, abbreviated cadence: delivers sincere interpersonal warmth within tight sentence boundaries.';
-    case 'gpt-4-turbo':
-      return 'Observe the thorough multi-stage progression: carefully builds out detailed context before delivering structured conclusions.';
-    case 'grok-2':
-      return 'Observe the playful rhetorical pacing: uses conversational challenges and interactive questions to engage the recipient.';
-    default:
-      return 'Observe the measured sentence pacing and structural flow tailored to the situation.';
-  }
+export function describeResponseStructure(response: string): string {
+  const text = response.trim();
+  // Protect abbreviations so "Mr. Henderson" or "e.g." do not count as sentence ends.
+  const guarded = text.replace(/\b(Mr|Mrs|Ms|Dr|St|vs|e\.g|i\.e)\./gi, (m) => m.replace('.', '\u0000'));
+  const sentences = guarded.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  const n = Math.max(1, sentences.length);
+  const words = text.split(/\s+/).filter(Boolean).length;
+  const NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  const countWord = n < NUM.length ? NUM[n] : String(n);
+  const lengthFact = `${countWord[0].toUpperCase()}${countWord.slice(1)} ${n === 1 ? 'sentence' : 'sentences'}, ${words} words`;
+
+  const first = sentences[0] || '';
+  const last = sentences[sentences.length - 1] || '';
+  let opening: string | null = null;
+  if (/^(hi|hey|hello|dear|good (morning|afternoon|evening))\b/i.test(first)) opening = 'opens with a greeting';
+  else if (/^(thanks|thank you)\b/i.test(first)) opening = 'opens with thanks';
+  else if (/^(i['\u2019]?m (so |really |truly )?sorry|sorry|i apologi[sz]e|apologies)\b/i.test(first)) opening = 'opens with an apology';
+
+  // n't, 'm, 're, 'll, 've, 'd, and pronoun/demonstrative 's (it's, that's, let's). A bare noun + 's is a
+  // possessive, not a contraction, so it is deliberately not matched.
+  const contractions =
+    /\b(?:[a-z]+n['\u2019]t|[a-z]+['\u2019](?:m|re|ll|ve|d)|(?:it|that|he|she|there|what|who|here|let)['\u2019]s)\b/i.test(text);
+  const exclamations = (text.match(/!/g) || []).length;
+
+  let closing: string;
+  if (/\?["')\]]*$/.test(last)) closing = 'ends with a question';
+  else if (/(let me know|feel free|reach out|happy to help)/i.test(last)) closing = 'ends by inviting a reply';
+  else if (/!["')\]]*$/.test(last)) closing = 'ends on an exclamation';
+  else closing = 'ends with a statement';
+
+  const items: string[] = [];
+  if (opening) items.push(opening);
+  items.push(contractions ? 'uses contractions' : 'uses no contractions');
+  items.push(
+    exclamations === 0 ? 'has no exclamation marks' : `has ${exclamations} exclamation mark${exclamations === 1 ? '' : 's'}`,
+  );
+  items.push(closing);
+  const joined = items.length > 1 ? `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}` : items[0];
+  return `${lengthFact}; ${joined}.`;
 }
 
 /**
@@ -296,6 +344,10 @@ export function getModelObservableNuanceClue(modelId: string): string {
       return 'Demonstrates meticulous thoroughness and balanced academic formality.';
     case 'grok-2':
       return 'Infuses responses with casual charm, sharp wit, and direct informal candor.';
+    case 'copilot':
+      return 'Blends warm accessibility with gentle structured helpfulness and supportive phrasing.';
+    case 'perplexity-sonar':
+      return 'Prioritizes informative conciseness and measured precision in every reply.';
     default:
       return 'Maintains a distinctive communicative signature throughout the response.';
   }
@@ -310,6 +362,8 @@ export function sanitizeHint(text: string): string {
   let cleaned = text;
 
   const forbiddenPatterns = [
+    /\bContext window is [^.]+\.?/gi,
+    /\bDeveloped by [^.]+\.?/gi,
     /\b(?:Claude 3\.5 Sonnet|Claude 3\.5 Haiku|Claude 3 Opus|Claude 3|Claude)\b/gi,
     /\b(?:GPT-4o|GPT-4-turbo|GPT-4 Turbo|GPT-4|ChatGPT|OpenAI)\b/gi,
     /\b(?:Gemini 1\.5 Pro|Gemini 1\.5 Flash|Gemini Pro|Gemini Flash|Gemini|Google)\b/gi,
@@ -318,8 +372,9 @@ export function sanitizeHint(text: string): string {
     /\b(?:DeepSeek V3|DeepSeek-V3|DeepSeek)\b/gi,
     /\b(?:Grok 2|Grok-2|Grok|xAI)\b/gi,
     /\b(?:Anthropic|Cohere)\b/gi,
-    /\bContext window is [^.]+\.?/gi,
-    /\bDeveloped by [^.]+\.?/gi,
+    /\b(?:Microsoft Copilot|Copilot|Microsoft)\b/gi,
+    /\b(?:Perplexity Sonar|Perplexity AI|Perplexity)\b/gi,
+    /\bDeveloped by\.?/gi,
   ];
 
   for (const pattern of forbiddenPatterns) {
@@ -392,7 +447,7 @@ function createVerifiedChallenge(data: {
 
   const stylometryClue = sanitizeHint(data.hints.stylometryClue);
   const structuralClue = sanitizeHint(
-    data.hints.structuralClue || data.hints.contextClue || getModelObservableStructureClue(data.targetModelId),
+    data.hints.structuralClue || data.hints.contextClue || describeResponseStructure(data.targetResponse),
   );
   const developerClue = sanitizeHint(
     data.hints.developerClue || getModelObservableNuanceClue(data.targetModelId),
@@ -454,7 +509,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3 (temperature 0.7)',
     verifiedAt: '2024-08-15T14:30:00Z',
     hints: {
-      stylometryClue: 'Specific shared detail callback ("photography trips"), empathetic conversational framing ("rather than leave things hanging"), and warm closure.',
+      stylometryClue: 'Specific shared detail callback ("photography trips"), a stated reason for being upfront ("rather than leave things hanging"), and a warm closing wish.',
       structuralClue: 'Opens with honest personal appreciation, delivers a clear boundary without coldness, and closes with sincere goodwill.',
     },
     responseAnalysis: 'Crafts emotionally intelligent interpersonal notes that avoid stiff clichés. It pairs sincere appreciation with clear closure, honoring mutual time without unnecessary coldness.',
@@ -465,35 +520,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hi! Thanks again for grabbing coffee yesterday. I enjoyed our conversation, but to be completely honest, I didn't feel a romantic spark between us. I wanted to let you know out of respect for your time, and I wish you all the best!",
-        keyStylometricNote: 'Polished and courteous tone, relying on balanced transition phrases like "out of respect for your time".',
+        keyStylometricNote: 'Polished phrasing with a stock politeness formula ("out of respect for your time"), an upbeat "Hi!" opener, and a warm sign-off.',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Thanks for meeting up yesterday. I enjoyed our conversation, but I didn't feel a romantic connection. I wanted to be direct and wish you the best in your search.",
-        keyStylometricNote: 'Delivers maximum conciseness with polite European directness and zero filler.',
+        keyStylometricNote: 'Three brief sentences that thank them ("Thanks for meeting up yesterday"), name the missing "romantic connection" once, and close with a short good wish.',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey, thanks for meeting up for coffee yesterday! I had fun chatting, but I didn't really feel that romantic click. Wanted to be honest with you—best of luck out there!",
-        keyStylometricNote: 'Relaxed, casual, and uses grounded everyday phrasing like "romantic click".',
+        keyStylometricNote: 'Relaxed and casual, with everyday spoken phrasing like "romantic click" and "best of luck out there".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Thanks so much for taking the time to grab coffee yesterday! I enjoyed hearing all about your travel plans, but I don't think we have the romantic chemistry I'm looking for. Wanted to let you know right away—wishing you the best!",
-        keyStylometricNote: 'Energetic, clear, and proactive with upbeat conversational momentum.',
+        keyStylometricNote: 'Enthusiastic thanks up front, a specific callback to the other person\'s \"travel plans\", and a note that it is being shared \"right away\".',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Thank you for taking the time to meet for coffee yesterday. While I appreciated our conversation, I did not sense a romantic alignment. I wanted to communicate this clearly and wish you the best going forward.",
-        keyStylometricNote: 'Structured, objective, and methodical language with tidy sentence boundaries.',
+        keyStylometricNote: 'Spells words out in full ("I did not sense a romantic alignment") and frames the news with "While I appreciated our conversation" before a formal good wish.',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Thanks for taking the time to meet up for coffee yesterday! I really enjoyed our conversation, but after thinking it over, I don't feel the romantic connection we're both looking for. I wanted to be honest with you rather than string things along. Truly wishing you all the best!",
+        keyStylometricNote: 'Begins with an appreciative opening, acknowledges thinking it over, and notes wanting to be honest "rather than string things along."',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Thank you for meeting yesterday. I enjoyed our conversation, but I did not feel a romantic spark. I appreciate your time and wanted to be direct so neither of us invests further. Wishing you the best going forward.",
+        keyStylometricNote: 'Delivers a straightforward decline noting "so neither of us invests further" and concludes with a concise good wish.',
       },
     ],
   }),
@@ -510,7 +579,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Direct API benchmark response 2024-08',
     verifiedAt: '2024-08-16T10:15:00Z',
     hints: {
-      stylometryClue: 'Supportive sandwich structure (positive validation + clear preference + forward-looking reassurance) with upbeat exclamation points.',
+      stylometryClue: 'Opens with enthusiasm ("having so much fun on our dates!"), explains the pace as a personal habit ("I tend to move a bit slower"), and ends reassuringly about "where things are heading".',
       structuralClue: 'Three-stage balanced structure: affirms the connection first, frames the boundary as personal rhythm rather than critique, and ends with mutual optimism.',
     },
     responseAnalysis: 'Balances emotional reassurance with clarity by using an affirmative structure: opening with validation, setting a boundary as a personal preference rather than a critique, and closing with shared optimism.',
@@ -528,28 +597,42 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "I enjoy our time together and want to keep seeing you, but I prefer to take things at a slower pace in the beginning. Let's continue getting to know each other steadily.",
-        keyStylometricNote: 'Calm, clear, and economical without emotional preamble.',
+        keyStylometricNote: 'Two plain sentences: it says it wants to "keep seeing you", states a preference for "a slower pace in the beginning", and offers no extra reassurance.',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey, I'm having a great time hanging out with you and definitely want to keep seeing where this goes. I just usually move a bit slower when dating, so I want to make sure we don't rush things. Looking forward to our next hangout!",
-        keyStylometricNote: 'Casual vocabulary ("hanging out", "rush things") with relaxed pacing.',
+        keyStylometricNote: 'Starts informally ("Hey, I\'m having a great time hanging out with you"), explains with "I just usually move a bit slower when dating", and signs off excited for the "next hangout!"',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "I've had so much fun on our dates these past few weeks! Because I really value getting to know each other, I like taking new relationships at a more measured pace. Looking forward to seeing you this weekend!",
-        keyStylometricNote: 'Proactive value statements and straightforward optimism.',
+        keyStylometricNote: 'Opens with enthusiasm about the dates so far, states a personal value (\"I really value getting to know each other\") to explain the pace, and ends on a concrete weekend plan.',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "I appreciate our time together over the past three weeks and want to continue getting to know you. However, I prefer pacing new relationships gradually. I look forward to continuing at a comfortable rhythm.",
-        keyStylometricNote: 'Objective, balanced framing with structured clauses.',
+        keyStylometricNote: 'Measured reply that pivots on "However, I prefer pacing new relationships gradually", closes with "a comfortable rhythm", and uses no contractions.',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "I've been really enjoying our time together over these past three weeks, and I definitely want to keep seeing you! I did want to mention that things feel like they're moving a little fast for me right now. I'd love to slow our pace down just a bit so we can really get to know each other naturally. How does that sound to you?",
+        keyStylometricNote: 'Validates interest warmly, requests to "slow our pace down just a bit", and checks in collaboratively at the finish.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "I am having a wonderful time getting to know you and value the connection we are building. However, I prefer taking things a bit slower at this stage so we can build a solid foundation. I still look forward to our next date this week.",
+        keyStylometricNote: 'States personal preference clearly with "prefer taking things a bit slower at this stage" while affirming the upcoming date.',
       },
     ],
   }),
@@ -568,7 +651,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     verifiedAt: '2024-08-20T18:00:00Z',
     hints: {
       stylometryClue: 'Playful faux-investigative banter ("verify these credentials"), specific baking jargon, and direct conversational challenge.',
-      structuralClue: 'Opens with high-stakes teasing, followed by a witty either/or dilemma and an interactive hook question.',
+      structuralClue: 'Opens by treating the claim as a \"very high-stakes\" statement, then offers an either/or question that ends in a mock challenge to prove it.',
     },
     responseAnalysis: 'Employs dynamic situational banter, playfully interrogating the prompt’s premise with confident colloquial humor and an engaging interactive hook.',
     distinguishingTraits: ['Playful challenge framing', 'Colloquial confident cadence', 'Interactive hook question'],
@@ -578,35 +661,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "That is a bold sourdough claim for someone whose bread I haven't taste-tested yet! What's the secret—super active starter, or do you just have an obsessive baker's schedule?",
-        keyStylometricNote: 'Warm, natural, and invites an easy story-driven response.',
+        keyStylometricNote: 'Teases the claim as "a bold sourdough claim", admits it hasn\'t "taste-tested" the bread, and ends with a single either/or question set off by a dash.',
       },
       {
         modelId: 'gpt-4o',
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Best homemade sourdough in the city? That's quite the title to hold! What's the secret to your crust, and how long have you been keeping your starter alive?",
-        keyStylometricNote: 'Cheerful, tidy, and asks structured inquisitive questions.',
+        keyStylometricNote: 'Echoes the boast as a question ("Best homemade sourdough in the city?"), reacts with "quite the title to hold!", and finishes with two linked questions about crust and starter.',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "That is a serious claim about your sourdough. What hydration percentage are you running, or is the recipe top secret?",
-        keyStylometricNote: 'Direct, technical question with dry conversational flair.',
+        keyStylometricNote: 'Two sentences with no exclamation marks: it calls the boast "a serious claim", then asks about "hydration percentage" before a dry "top secret?" aside.',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Big sourdough claims! Are we talking legit bakery level, or is this just hype? What's your starter's name, because I know all serious bakers name theirs.",
-        keyStylometricNote: 'Punchy informal banter and relatable trivia.',
+        keyStylometricNote: 'Reacts with "Big sourdough claims!", asks "legit bakery level, or is this just hype?", and jokes that "all serious bakers name theirs".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Claiming the best sourdough in the city is a bold opener! Do you have an active 5-year-old starter, or is this all beginner's luck with Dutch oven bread? Tell me your favorite loaf to bake.",
-        keyStylometricNote: 'Energetic, enthusiastic, and asks upbeat interactive questions.',
+        keyStylometricNote: 'Calls the claim "a bold opener!", guesses at specifics versus "beginner\'s luck", and ends with an instruction instead of a question: "Tell me your favorite loaf to bake."',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Claiming the best homemade sourdough in the entire city is a pretty bold statement! Are we talking a secret family starter with years of history, or did you master the craft during lockdown? Either way, I might need an official taste test before I can endorse that title.",
+        keyStylometricNote: 'Playfully challenges the sourdough claim, inquires about a "secret family starter", and jokingly requests an official taste test.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "That is a high-stakes claim about your sourdough. What is the hydration percentage, and how long does it take for a loaf to earn that reputation? I'm ready to be convinced.",
+        keyStylometricNote: 'Asks technical baking questions including the "hydration percentage" while maintaining a brisk, curious conversational hook.',
       },
     ],
   }),
@@ -645,28 +742,42 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey, I'm really sorry I missed your birthday yesterday. Totally slipped my mind and I feel terrible. Hope you had a great one! Let me buy you dinner sometime this week to make it up to you.",
-        keyStylometricNote: 'Relaxed, casual, and straightforward.',
+        keyStylometricNote: 'Apologises in fragments ("Totally slipped my mind and I feel terrible"), wishes them a "great one!", and offers dinner "sometime this week" to "make it up to you".',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "I am really sorry for missing your birthday yesterday. I hope you had a great day celebrating. Please let me treat you to lunch or dinner this week so we can celebrate properly.",
-        keyStylometricNote: 'Keeps the apology concise, polite, and respectful without excess padding.',
+        keyStylometricNote: 'Full sentences with no contractions: "I am really sorry for missing your birthday", a wish for a "great day celebrating", and an offer of "lunch or dinner this week".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "I am so sorry I missed your birthday yesterday! Completely my fault for losing track of the date. I hope you had a fantastic day, and I'd love to take you out this week to celebrate your birthday dinner on me.",
-        keyStylometricNote: 'Direct, energetic, and immediately action-oriented.',
+        keyStylometricNote: 'Takes blame outright ("Completely my fault for losing track of the date") and offers to take them out "this week" for a "birthday dinner on me".',
       },
       {
         modelId: 'claude-3-5-haiku',
         model: 'Claude 3.5 Haiku',
         version: 'claude-3-5-haiku-20241022',
         response: "I'm so sorry for missing your birthday yesterday! Totally dropped the ball and feel awful. Hope you had a wonderful day—dinner is 100% on me this week whenever you're free.",
-        keyStylometricNote: 'Punchy, warm, and highly economical.',
+        keyStylometricNote: 'Short and exclamatory: owns the lapse with "Totally dropped the ball and feel awful", then offers "dinner is 100% on me" for "whenever you\'re free".',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "I am so terribly sorry—I completely dropped the ball and missed your birthday yesterday. There are no excuses; you mean the world to me and deserve to be celebrated properly. Please let me treat you to dinner or drinks this week so I can celebrate you the right way. Can I take you out this Thursday or Friday?",
+        keyStylometricNote: 'Expresses unconditional ownership by stating "completely dropped the ball" and proposes specific weeknight options to make amends.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "I completely missed your birthday yesterday, and I am truly sorry. You deserve full celebration on your special day. I would love to take you out for dinner this week to celebrate properly—let me know which evening suits you best.",
+        keyStylometricNote: 'Acknowledges the lapse without deflection, stating "You deserve full celebration on your special day" before requesting an evening preference.',
       },
     ],
   }),
@@ -694,35 +805,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hey Sam, hope your week is going okay! Would you mind clearing out the pots in the sink sometime before this evening? I'm planning to cook dinner tonight and need to use the sink. Really appreciate it!",
-        keyStylometricNote: 'Warm, polite, and gives a clear reasonable time window.',
+        keyStylometricNote: 'Warm check-in first ("hope your week is going okay!"), then a soft request ("Would you mind clearing out the pots") with the window "sometime before this evening".',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi Sam, could you please wash the pots in the sink today? I need to use the kitchen space to make dinner tonight. Thank you.",
-        keyStylometricNote: 'Short, direct, and matter-of-fact.',
+        keyStylometricNote: 'Three sentences with no pleasantries: one request ("could you please wash the pots in the sink today?"), a one-line reason about "kitchen space", and a bare "Thank you."',
       },
       {
         modelId: 'gpt-4o',
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hi Sam! Hope you're having a good week. Could you do me a quick favor and wash the pots soaking in the sink today? I'm planning on cooking tonight and need the space to prep. Thanks so much for your help!",
-        keyStylometricNote: 'Polished and upbeat with classic courteous padding.',
+        keyStylometricNote: 'Frames the request as "a quick favor", opens with "Hope you\'re having a good week", and closes with the effusive "Thanks so much for your help!"',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Hey Sam, could you clear the pots out of the sink when you get a chance today? I need to cook dinner tonight and could really use the sink space. Thanks!",
-        keyStylometricNote: 'Brisk, practical, and cleanly formatted.',
+        keyStylometricNote: 'Casual and brief: asks "when you get a chance today?", gives the reason "I need to cook dinner tonight", and signs off with a one-word "Thanks!"',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Hi Sam, could you please clean the pots in the sink when you have a moment today? I will need the sink space for cooking dinner this evening. Thank you.",
-        keyStylometricNote: 'Structured, neutral, and courteous directness.',
+        keyStylometricNote: 'Writes "I will need" instead of a contraction, uses the polite "when you have a moment today", and ends with a plain "Thank you."',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hey! Hope your week is going well. Could you please take care of the pots soaking in the sink sometime today? I'm hoping to cook dinner tonight and need the counter and sink space cleared. Let me know if you need a hand tackling them!",
+        keyStylometricNote: 'Frames the request around personal cooking plans while politely asking to "take care of the pots soaking in the sink" today.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hi there. The cookware in the kitchen sink has been sitting for a few days now, and we need the basin cleared for cooking. Please wash them by this evening so the shared area remains usable. Thanks for your help.",
+        keyStylometricNote: 'Focuses on shared utility, asking to wash the cookware so the "shared area remains usable" for housemates.',
       },
     ],
   }),
@@ -751,35 +876,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hi Elena, I wanted to let you know right away that I missed sending out the client summary before leaving yesterday. That's entirely on me, and I apologize for the oversight! I have just emailed the finalized summary to the client and will follow up with them this afternoon to ensure everything is on track.",
-        keyStylometricNote: 'Energetic reassurance and proactive scheduling details.',
+        keyStylometricNote: 'Leads with "I wanted to let you know right away", takes blame with "That\'s entirely on me", and promises a follow-up "this afternoon" after the summary is sent.',
       },
       {
         modelId: 'claude-3-5-sonnet',
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hi Elena, I dropped the ball on sending the client summary before logging off yesterday—I'm really sorry for the lapse. I just sent the complete document over to their team with an apology for the morning delivery, and I'll keep you posted if they have any immediate notes.",
-        keyStylometricNote: 'Candid personal responsibility and smooth narrative flow.',
+        keyStylometricNote: 'Admits it "dropped the ball" in one dash-joined sentence, reports the fix already made, and promises to "keep you posted".',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Elena, I overlooked transmitting the client summary yesterday afternoon. The completed summary has now been dispatched to the client, and I am monitoring for their confirmation.",
-        keyStylometricNote: 'Formal operational language ("transmitted", "dispatched").',
+        keyStylometricNote: 'Skips any apology and states the lapse in formal terms ("I overlooked transmitting"), then reports the fix as "dispatched" and "monitoring for their confirmation".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Hi Elena, I missed sending out the client summary yesterday before logging off. I apologize for the delay—I've just sent the finalized document to the client and will monitor for their feedback this morning.",
-        keyStylometricNote: 'Direct, concise, and focused on operational follow-through.',
+        keyStylometricNote: 'Pairs a brief apology ("I apologize for the delay") with the fix already done ("I\'ve just sent the finalized document") and a plan to "monitor for their feedback this morning".',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hi Elena, realized I slipped up and didn't send the client summary yesterday before heading out—my bad on that. I've sent the finalized document over to them this morning and am following up to make sure they got it.",
-        keyStylometricNote: 'Grounded colloquial accountability ("my bad on that") and practical cadence.',
+        keyStylometricNote: 'Casual owning-up in everyday slang ("my bad on that"), followed by a plain report of what was already sent.',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hi Sarah, I want to apologize for missing the deadline on sending the weekly client summary before logging off yesterday. I have finalized the document and attached it here for your review, and I am ready to dispatch it to the client immediately upon your approval. To ensure this doesn't happen again, I've set an automated end-of-day reminder for all future client deliverables.",
+        keyStylometricNote: 'Details corrective steps by providing an attached draft and noting an "automated end-of-day reminder for all future client deliverables."',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hi Mark, I neglected to transmit the client briefing document prior to departing yesterday. The summary is now completed and attached for your inspection. With your confirmation, I will forward it to the account stakeholders within the hour. I have updated my tracking checklist to prevent recurrence.",
+        keyStylometricNote: 'Reports the oversight plainly and pledges to reach "account stakeholders within the hour" following managerial sign-off.',
       },
     ],
   }),
@@ -800,7 +939,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3',
     verifiedAt: '2024-08-21T15:00:00Z',
     hints: {
-      stylometryClue: 'Warm coworker rapport, explicit reciprocity offer, and an authentic low-pressure closing ("No worries at all if that doesn\'t work...").',
+      stylometryClue: 'Warm coworker rapport, explicit reciprocity offer, and a low-pressure closing ("No worries at all if that doesn\'t work...").',
       structuralClue: 'Natural conversational rhythm: greets warmly, outlines the family constraint, offers future coverage, and graciously relieves any obligation.',
     },
     responseAnalysis: 'Avoids stiff corporate templates, adopting a warm, natural coworker tone that protects workplace rapport while offering explicit reciprocal flexibility.',
@@ -811,35 +950,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hi Sarah, hope you're having a good week! Would you be open to swapping shifts with me this Saturday? A family commitment came up that I need to attend. I'm more than happy to take one of your upcoming shifts to return the favor—let me know if that might work for you!",
-        keyStylometricNote: 'Polished and structured with neat, balanced sentences.',
+        keyStylometricNote: 'Polished phrasing with a friendly greeting, a polite \"Would you be open to...\" request, and an offer to \"return the favor\".',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi Sarah, are you available to swap shifts this Saturday? A family event came up on my end. I can cover your next scheduled shift in exchange if that works for you.",
-        keyStylometricNote: 'Goes straight to the swap mechanics with zero wasted words.',
+        keyStylometricNote: 'Three sentences that go straight to the swap: "are you available to swap shifts this Saturday?", a one-line reason ("A family event came up"), and an offer to "cover your next scheduled shift".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Hey Sarah, quick question for you: Would you be able to switch shifts with me this Saturday? I have an unexpected family event. I'd gladly take any of your shifts next week to make up for it. Thanks either way!",
-        keyStylometricNote: 'Brisk, upbeat, and clearly structured.',
+        keyStylometricNote: 'Flags the ask first ("quick question for you:"), offers to "take any of your shifts next week", and ends by thanking them regardless: "Thanks either way!"',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey Sarah! Any chance you can cover for me this Saturday? Got hit with a family thing. Happy to take your next shift or whenever you need time off. Let me know if that works!",
-        keyStylometricNote: 'Informal, friendly, and uses colloquial cadence.',
+        keyStylometricNote: 'Informal and clipped: \"Got hit with a family thing\" in place of a formal explanation, then a loose offer to take a shift \"whenever you need time off\".',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Hi Sarah, are you open to exchanging shifts for this coming Saturday due to a personal family obligation? I am available to cover an upcoming shift of yours in exchange. Thank you for considering.",
-        keyStylometricNote: 'Polite, systematic, and formal language structure.',
+        keyStylometricNote: 'Stiffly worded (\"exchanging shifts\", \"personal family obligation\"), with a plain offer to cover and a courteous thank-you.',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hey Alex, hope you're having a good week! A family commitment unexpectedly came up for this Saturday, and I was wondering if you might be open to swapping shifts with me? I'd be more than happy to cover any upcoming shift of yours in exchange. No worries at all if your weekend is already packed, but let me know!",
+        keyStylometricNote: 'Solicits a schedule adjustment warmly, offering to cover "any upcoming shift of yours in exchange" without pressuring the peer.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hello Jordan, are you available to swap shifts this Saturday? An unavoidable family matter arose that prevents me from working. I can take your shift next Sunday or cover another day of your choice next week. Please let me know if that works.",
+        keyStylometricNote: 'States the scheduling conflict directly and presents specific availability to "take your shift next Sunday" in return.',
       },
     ],
   }),
@@ -867,35 +1020,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hi David, thanks for reaching out. I have preexisting plans this Saturday so I won't be able to cover the extra shift. Hope you're able to find coverage, and I'll see you on Monday!",
-        keyStylometricNote: 'Keeps the boundary smooth and unforced.',
+        keyStylometricNote: 'Declines with a stated reason ("preexisting plans this Saturday"), wishes him luck finding "coverage", and ends by confirming "I\'ll see you on Monday!"',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi David, thank you for checking with me. I am unavailable this Saturday due to prior commitments and cannot take the extra shift. I will see you Monday as scheduled.",
-        keyStylometricNote: 'Crisp, polite, and completely devoid of unnecessary fluff.',
+        keyStylometricNote: 'Contraction-free decline: "I am unavailable this Saturday due to prior commitments", then "cannot take the extra shift", then a flat confirmation, "as scheduled."',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey David, thanks for asking, but I already have plans locked in for Saturday so I won't be able to come in. See you on Monday!",
-        keyStylometricNote: 'Casual conversational phrasing ("locked in").',
+        keyStylometricNote: 'Informal decline in one run-on sentence ("I already have plans locked in for Saturday") followed by a clipped sign-off, "See you on Monday!"',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Hi David, thanks for the heads-up! I'm unable to pick up the Saturday shift due to existing personal plans, but I will be ready to go for my regular shift on Monday.",
-        keyStylometricNote: 'Energetic, direct, and affirms upcoming availability.',
+        keyStylometricNote: 'Thanks him for the "heads-up!", declines because of "existing personal plans", and volunteers readiness for "my regular shift on Monday".',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "David, thank you for checking. I am unable to take the Saturday shift due to prior commitments scheduled for that day. I will report for my standard shift on Monday morning.",
-        keyStylometricNote: 'Structured, neutral, and matter-of-fact professional syntax.',
+        keyStylometricNote: 'Addresses him by name alone, uses no contractions, cites "prior commitments scheduled for that day", and ends with "I will report for my standard shift on Monday morning."',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hi David, thanks for reaching out. Unfortunately, I have personal commitments scheduled this Sunday that I'm unable to reschedule, so I won't be able to pick up the extra shift. I appreciate you thinking of me, and I look forward to my scheduled shifts next week!",
+        keyStylometricNote: 'Explains that personal commitments are "unable to reschedule" while keeping an appreciative and courteous working rapport.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hi Rachel, thank you for checking with me. Because Sunday is my sole rest day this week and I have prior arrangements, I cannot take on the additional shift. I will be fully prepared for our scheduled roster starting Monday morning.",
+        keyStylometricNote: 'Cites prior plans on their "sole rest day this week" and confirms readiness for the upcoming work cycle.',
       },
     ],
   }),
@@ -913,7 +1080,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3 (sub-build variations documented)',
     verifiedAt: '2024-08-23T14:10:00Z',
     hints: {
-      stylometryClue: 'Friendly greeting paired with a specific hard deadline ("by 2 PM today") and a helpful fallback option ("pull preliminary numbers myself").',
+      stylometryClue: 'Friendly greeting paired with a specific hard deadline ("by 2 PM today") and a helpful fallback option ("pull the preliminary numbers myself").',
       structuralClue: 'Constructive off-ramp structure: identifies the constraint, explains the downstream presentation need, and offers to pull numbers personally.',
     },
     responseAnalysis: 'Writes exceptional collaborative workplace messages: stating the operational constraint clearly while proposing a constructive off-ramp so the blocker is resolved collaboratively.',
@@ -924,35 +1091,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hi Jordan! Hope you're having a productive week. Following up on the Q3 conversion report from earlier this week. I'm finalizing the presentation for leadership today, so having those figures by 1 PM would be a huge help. Let me know if you need any help wrapping it up!",
-        keyStylometricNote: 'Upbeat encouragement and offers collaborative assistance.',
+        keyStylometricNote: 'Softens the nudge with "Hope you\'re having a productive week", gives a concrete deadline ("by 1 PM"), and closes by offering help: "Let me know if you need any help wrapping it up!"',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi Jordan, I am checking on the status of the Q3 data report. I must finalize the presentation slides by 2 PM today. Please confirm when the data will be available.",
-        keyStylometricNote: 'Concise, firm, and focused on deadlines.',
+        keyStylometricNote: 'States the need flatly ("I must finalize the presentation slides by 2 PM today"), asks for a status check, and requests confirmation of "when the data will be available."',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Jordan, please provide the Q3 conversion dataset. The slide deck review is scheduled for this afternoon, requiring data integration by 2:00 PM. Please update on deliverable status.",
-        keyStylometricNote: 'Procedural vocabulary and formal structuring.',
+        keyStylometricNote: 'Opens with an imperative ("please provide the Q3 conversion dataset"), justifies it with "data integration by 2:00 PM", and ends with a request to "update on deliverable status."',
       },
       {
         modelId: 'gemini-1-5-flash',
         model: 'Gemini 1.5 Flash',
         version: 'gemini-1.5-flash-001',
         response: "Hey Jordan, following up on the Q3 numbers needed for today's 2 PM deck. Can you send those over shortly so I can plug them in? Thanks!",
-        keyStylometricNote: 'Rapid, direct, and minimal.',
+        keyStylometricNote: 'Very short follow-up: "following up on the Q3 numbers", a casual ask to "plug them in", and a one-word "Thanks!" sign-off.',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey Jordan, hope your week's going well! Quick check-in on the Q3 numbers—I've got to lock the slide deck by 2 PM today. Could you shoot those over when you get a sec? Thanks!",
-        keyStylometricNote: 'Relaxed, casual, and friendly without being confrontational.',
+        keyStylometricNote: 'Casual check-in ("Quick check-in on the Q3 numbers") with slangy phrasing: "lock the slide deck" and "shoot those over when you get a sec?"',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hey Marcus, hope you're doing well! Just wanted to check in on the status of the Q3 metrics report. Our presentation slides are due to leadership tomorrow afternoon, so we really need those data points finalized by 2 PM today to wrap everything up. Please let me know if you're running into any roadblocks or if there's anything I can do to help unblock you!",
+        keyStylometricNote: 'Balances urgency with assistance, establishing a strict deadline of "2 PM today to wrap everything up" while offering help.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hi Elena, checking in on the outstanding metrics summary, which is now two days past the target date. The final presentation deck requires these numbers before 3:00 PM today for leadership review. Please provide the latest dataset or share an estimated completion time.",
+        keyStylometricNote: 'Notes the timeline discrepancy objectively, requesting an "estimated completion time" before the presentation review cutoff.',
       },
     ],
   }),
@@ -973,7 +1154,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3',
     verifiedAt: '2024-08-24T17:00:00Z',
     hints: {
-      stylometryClue: 'Honest vulnerability ("completely wiped out", "not good company"), genuine apology, and an immediate concrete reschedule offer.',
+      stylometryClue: 'Honest vulnerability ("completely wiped out", "don\'t think I\'d be good company"), genuine apology, and an immediate concrete reschedule offer.',
       structuralClue: 'Two-sentence emotional arc: validates personal social battery limits honestly, then immediately protects the friendship with an offer to treat.',
     },
     responseAnalysis: 'Honors personal energy limits honestly without inventing theatrical illness, while prioritizing the friendship with an immediate reschedule proposal.',
@@ -984,35 +1165,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hey Maya, I'm so sorry, but I'm feeling totally exhausted today and need to take the evening to rest. Can we please take a rain check and reschedule for next week? I'm so looking forward to catching up soon!",
-        keyStylometricNote: 'Friendly popular idioms like "take a rain check" with cheerful closure.',
+        keyStylometricNote: 'Apologises up front ("I\'m so sorry"), proposes to "take a rain check and reschedule for next week", and closes enthusiastically: "I\'m so looking forward to catching up soon!"',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey Maya, I'm really sorry to bail, but I'm running on empty today and need to crash tonight. Let's definitely reschedule for next week when I'm back to 100%.",
-        keyStylometricNote: 'Grounded colloquial expressions ("running on empty", "crash tonight").',
+        keyStylometricNote: 'Casual everyday expressions ("running on empty", "crash tonight") and a relaxed reschedule promise ("back to 100%").',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi Maya, I am feeling very exhausted today and need to cancel our dinner tonight. Sincere apologies for the short notice—let's reschedule for some time next week.",
-        keyStylometricNote: 'Direct, respectful, no-excuse notification.',
+        keyStylometricNote: 'Cancels outright ("need to cancel our dinner tonight"), apologises for "the short notice", and proposes rescheduling, all in one dash-joined sentence.',
       },
       {
         modelId: 'grok-2',
         model: 'Grok 2',
         version: 'grok-2-2024-08-13',
         response: "Hey Maya, I'm running on zero battery today and need to bow out of dinner tonight. Super sorry for the late notice—can I buy your meal when we reschedule next week?",
-        keyStylometricNote: 'Punchy, colloquial ("running on zero battery"), and casual.',
+        keyStylometricNote: 'Uses a battery metaphor ("running on zero battery"), says "bow out of dinner tonight", and offers a make-good: "can I buy your meal when we reschedule next week?"',
       },
       {
         modelId: 'claude-3-5-haiku',
         model: 'Claude 3.5 Haiku',
         version: 'claude-3-5-haiku-20241022',
         response: "Hey Maya, really sorry to cancel, but I'm completely exhausted today and need a quiet night. Could we push our dinner to next week? My treat!",
-        keyStylometricNote: 'Warm, brief, and to the point.',
+        keyStylometricNote: 'Three short sentences: "really sorry to cancel", a request to "push our dinner to next week", and a one-line offer, "My treat!"',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hey Sam, I'm so sorry, but I have to cancel our dinner tonight. I woke up feeling completely exhausted and running on empty, and I really need to stay in and rest tonight. I was so looking forward to seeing you—can we please reschedule for next week when I'll be much better company?",
+        keyStylometricNote: 'Communicates genuine low energy candidly with "running on empty", promising to reschedule when able to provide better company.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hi Jamie, I need to cancel our dinner plans for this evening. I am dealing with severe exhaustion today and need to prioritize rest rather than socializing. Let us pick another date next week once my energy is restored.",
+        keyStylometricNote: 'Declines social plans concisely, emphasizing the need to "prioritize rest rather than socializing" with an offer to reconnect.',
       },
     ],
   }),
@@ -1030,7 +1225,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3 (open-weight quant seed variance)',
     verifiedAt: '2024-08-25T13:45:00Z',
     hints: {
-      stylometryClue: 'Breezy casual tone, straightforward payment modality reminder, and zero emotional friction or passive aggression.',
+      stylometryClue: 'Friendly opener ("Hope you had an awesome weekend"), states the amount plainly ("$75 for the concert tickets"), lists payment apps ("Venmo or Zelle"), and signs off "Thanks man!"',
       structuralClue: 'Low-friction structure: frames the reminder as an ordinary check-in and immediately gives flexible payment options ("Venmo or Zelle").',
     },
     responseAnalysis: 'Excels at low-stakes everyday logistics: treating money reminders as ordinary administrative check-ins rather than tense confrontations, making repayment effortless and casual.',
@@ -1041,35 +1236,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hey Chris! Hope your week is off to a great start. Whenever you get a moment, could you send over that $75 for the concert tickets from last week? You can find me on Venmo @alex. Appreciate it!",
-        keyStylometricNote: 'Polished, structured, and cheerful.',
+        keyStylometricNote: 'Warm opener ("Hope your week is off to a great start"), a deferential request ("Whenever you get a moment"), a handle ("Venmo @alex"), and a closing "Appreciate it!"',
       },
       {
         modelId: 'claude-3-5-sonnet',
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hey Chris, hope you're doing well! Quick ping regarding the $75 concert ticket from the other week—no rush, just whenever you have a second to settle up via Venmo. Thanks so much!",
-        keyStylometricNote: 'Gentle low-pressure framing ("no rush, just whenever you have a second").',
+        keyStylometricNote: 'Calls it a "Quick ping", signals low urgency ("no rush, just whenever you have a second"), and thanks him with "Thanks so much!"',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi Chris, sending a quick reminder about the $75 for the concert tickets. Please send it over via Venmo or bank transfer when you can. Thank you.",
-        keyStylometricNote: 'Short, clear, and direct.',
+        keyStylometricNote: 'Three sentences with no small talk: "sending a quick reminder about the $75", payment options "Venmo or bank transfer", and a bare "Thank you."',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Hey Chris, hope things are going well! Whenever you get a chance, could you send over that $75 for the concert tickets? You can shoot it over on Venmo or PayPal. Thanks!",
-        keyStylometricNote: 'Straightforward, polite, and practical.',
+        keyStylometricNote: 'Opens with "hope things are going well!", asks "Whenever you get a chance", offers "Venmo or PayPal", and ends with "Thanks!"',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Hi Chris, hope you are doing well. Just a quick reminder regarding the $75 for the concert tickets from two weeks ago. Please transfer via Venmo whenever convenient. Thank you!",
-        keyStylometricNote: 'Orderly, courteous, and straightforward phrasing.',
+        keyStylometricNote: 'Avoids contractions ("hope you are doing well"), dates the debt ("from two weeks ago"), and asks to "transfer via Venmo whenever convenient."',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hey Liam! Hope you're having a great week. Just doing a quick check-in about the $75 for the concert tickets from a couple of weeks ago whenever you have a chance to send that over. No huge rush, just trying to get my monthly budget organized! My Venmo handle is @sample-handle.",
+        keyStylometricNote: 'Minimizes awkwardness by referencing monthly finances, asking for repayment "whenever you have a chance to send that over" with handle provided.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hey Maya, checking in regarding the $75 balance for the concert tickets purchased two weeks ago. When convenient, please transfer the funds via Venmo or Zelle to settle the expense. Thanks!",
+        keyStylometricNote: 'Keeps the financial reminder brief and factual, requesting to "settle the expense" via standard payment applications.',
       },
     ],
   }),
@@ -1087,7 +1296,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Direct API benchmark response 2024-08 (sub-build variations documented)',
     verifiedAt: '2024-08-26T16:00:00Z',
     hints: {
-      stylometryClue: 'Enthusiastic gratitude for the invitation, smooth general boundary without over-explaining finances, and a lower-commitment local alternative.',
+      stylometryClue: 'Opens with gratitude ("Thanks so much for thinking of me"), declines gently ("I won\'t be able to make it work this time around"), and proposes "grab a coffee sometime soon" instead.',
       structuralClue: 'Three-part social buffer structure: praises the invitation, declines politely without excuses, and proposes a lower-stakes local alternative.',
     },
     responseAnalysis: 'Crafts the ideal social buffer: affirming the invitee’s generosity, providing a clean polite decline without divulging private financial details, and substituting a manageable local hangout.',
@@ -1098,14 +1307,14 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Thank you for the invite! It sounds like such a fun trip, but I won't be able to swing it this time. Hope you guys have the best weekend out there—let's grab coffee or a drink sometime when you're back!",
-        keyStylometricNote: 'Relaxed vernacular ("swing it this time", "out there").',
+        keyStylometricNote: 'Declines casually ("I won\'t be able to swing it this time"), wishes them "the best weekend out there", and suggests "coffee or a drink sometime when you\'re back!"',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Thank you for the invitation. Unfortunately, I will not be able to join the trip this weekend. I hope you have a great time, and let's catch up another time.",
-        keyStylometricNote: 'Polite, concise European response.',
+        keyStylometricNote: 'Polite and compact: thanks for the invitation, a plain \"Unfortunately\" decline with no reason given, and a short good wish.',
       },
       {
         modelId: 'grok-2',
@@ -1119,7 +1328,28 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Thank you for the invitation to join the weekend trip. Unfortunately, I will not be able to participate this time. I hope you have a wonderful trip, and let's connect when you return.",
-        keyStylometricNote: 'Formal, tidy, and courteous.',
+        keyStylometricNote: 'Declines in formal phrasing ("Unfortunately, I will not be able to participate this time"), hopes for "a wonderful trip", and proposes "let\'s connect when you return."',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Thank you so much for including me in the trip invitation! It sounds like you all have an amazing getaway planned, but I won't be able to join this time around due to other budget priorities. I hope you have an incredible trip, and I'd love to catch up over coffee sometime soon!",
+        keyStylometricNote: 'Expresses polite appreciation while citing "other budget priorities" as the boundary, wishing the group a wonderful trip.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Thank you for the invitation to the cabin weekend. The itinerary sounds enjoyable, but the timing and budget do not align for me, so I must decline. I hope you and the group have a successful trip.",
+        keyStylometricNote: 'Conveys an unequivocal decision stating "the timing and budget do not align for me" without defensive elaboration.',
+      },
+      {
+        modelId: 'gemini-1-5-pro',
+        model: 'Gemini 1.5 Pro',
+        version: 'gemini-1.5-pro-001',
+        response: "Thanks so much for extending the invitation—that getaway sounds like an absolute blast! I have to pass this time as it doesn't fit my current travel budget, but I really appreciate you looping me in. I hope you all have a fantastic trip, and I'd love to catch up locally whenever you're back in town!",
+        keyStylometricNote: 'Expresses energetic gratitude for the invite, mentions the getaway "sounds like an absolute blast", and suggests catching up locally.',
       },
     ],
   }),
@@ -1151,35 +1381,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "I'm so sorry to hear that news. Going through four rounds is a huge investment of energy, and it's completely understandable to be disappointed. Please take all the time you need today—you have so much talent, and I'm always here if you want to talk or hang out!",
-        keyStylometricNote: 'Warm supportive encouragement with balanced structured sentences.',
+        keyStylometricNote: 'Warm, supportive phrasing that acknowledges the effort involved (\"a huge investment of energy\"), encourages rest, and offers to be available.',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Man, I'm so sorry. That seriously sucks after grinding through four rounds. You worked so hard and any team would be lucky to have you. Dinner is on me whenever you want to decompress.",
-        keyStylometricNote: 'Candid, gritty, and uses authentic conversational phrases like "seriously sucks".',
+        keyStylometricNote: 'Opens with "Man, I\'m so sorry", says it "seriously sucks after grinding through four rounds", and offers "Dinner is on me whenever you want to decompress."',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "I am really sorry to hear that. Four rounds is a significant effort, and it is completely normal to feel disappointed. Let me know if you want to meet up tonight or take your mind off things.",
-        keyStylometricNote: 'Clean, sincere emotional support with zero exaggerated drama.',
+        keyStylometricNote: 'Contraction-free sympathy ("I am really sorry to hear that"), normalises the feeling ("completely normal to feel disappointed"), and invites a meet-up "tonight".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "I am so sorry. Doing four rounds of interviews takes so much out of you, and it's completely unfair after that much effort. Take all the space you need today—I'm here whenever you want to grab food or vent.",
-        keyStylometricNote: 'Warm, validating, and directly supportive.',
+        keyStylometricNote: 'Validates with "it\'s completely unfair after that much effort", gives permission to "Take all the space you need today", and offers to "grab food or vent".',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "I am so sorry to hear this. Completing four interview rounds requires tremendous effort, and it is completely natural to feel disappointed right now. Please take time to decompress—I am here whenever you want to talk.",
-        keyStylometricNote: 'Balanced, structured, and validating without excessive sentimentality.',
+        keyStylometricNote: 'Formal sympathy ("I am so sorry to hear this") that calls the effort "tremendous", the feeling "completely natural", and offers "I am here whenever you want to talk."',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "I am so, so sorry. Going through four rounds of interviews takes an immense amount of energy, and it is completely unfair and devastating to get that news today. Please remember that this hiring outcome doesn't define your incredible capabilities or your worth. Take all the time you need to be angry or sad. I'm bringing over dinner whenever you're ready, or we can just sit in silence—whatever you need, I'm here.",
+        keyStylometricNote: 'Reassures the friend deeply, reminding them that the result "doesn\'t define your incredible capabilities" while offering physical support.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "I was disheartened to hear the interview news. Completing four extensive rounds demonstrates your strong qualifications, even if this particular organization made an unfortunate decision. Take time to process the frustration today. When you feel up to it, let me know how I can best support you.",
+        keyStylometricNote: 'Offers steady encouragement by validating their qualifications, calling the outcome an "unfortunate decision" without excessive melodrama.',
       },
     ],
   }),
@@ -1208,35 +1452,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hi! Thank you so much for being such a wonderful friend and checking in. I'm feeling a bit burned out and just need a quiet weekend to unplug and reset. Nothing is wrong at all, and I can't wait to catch up with you early next week!",
-        keyStylometricNote: 'Affirmative phrasing and positive future pacing.',
+        keyStylometricNote: 'Warm gratitude ("such a wonderful friend"), a plain reason ("a bit burned out"), a firm reassurance ("Nothing is wrong at all"), and an eager "early next week!"',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hey, really appreciate you checking on me! I'm just running on empty and need a solo weekend to recharge my battery. All good on my end—I'll hit you up on Monday.",
-        keyStylometricNote: 'Relaxed, informal ("running on empty", "hit you up").',
+        keyStylometricNote: 'Relaxed wording ("running on empty", "solo weekend"), reassures with "All good on my end", and promises to "hit you up on Monday."',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Thank you for checking in. I am taking this weekend to rest quietly and recharge. Everything is fine, and I will get back in touch with you early next week.",
-        keyStylometricNote: 'Calm, polite, and reassuring.',
+        keyStylometricNote: 'Three flat sentences without exclamation marks: "Thank you for checking in", "rest quietly and recharge", and "Everything is fine".',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Thank you for checking in, I truly appreciate your thoughtfulness. I am currently experiencing burnout and need this weekend to disconnect and rest. Everything is fine between us, and I will reconnect with you on Monday.",
-        keyStylometricNote: 'Clear, orderly sentence construction with polite reassurance.',
+        keyStylometricNote: 'Uses clinical wording ("experiencing burnout", "disconnect and rest"), reassures with "Everything is fine between us", and gives a dated plan: "reconnect with you on Monday."',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Thank you for checking in on me, you're the best! I'm just feeling pretty burned out lately and need a totally quiet weekend to recharge my batteries. We're totally good, and I'll catch up with you on Monday!",
-        keyStylometricNote: 'Energetic, affectionate, and establishes an upbeat clear timeframe.',
+        keyStylometricNote: 'Compliments the friend ("you\'re the best!"), stresses a "totally quiet weekend", reassures with "We\'re totally good", and sets "Monday" as the catch-up.',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "I really appreciate you checking in on me—your friendship means so much to me! I'm dealing with some heavy emotional burnout from work and life lately, and my social battery is pretty much at zero. I'm going to take this entire weekend completely off the grid to recharge quietly. Everything between us is great, and I promise to text you first thing Monday morning to catch up!",
+        keyStylometricNote: 'Affirms the friendship warmly, explaining that their battery is "pretty much at zero" with a commitment to connect Monday.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Thank you for your messages and concern. I am experiencing significant personal fatigue and need a quiet, solitary weekend to reset. There is no issue between us whatsoever; I simply need downtime away from my phone. I will reach out early next week.",
+        keyStylometricNote: 'Reassures the friend that there is "no issue between us whatsoever", explaining the temporary absence objectively.',
       },
     ],
   }),
@@ -1265,28 +1523,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hey, saw the photos from brunch yesterday and it looked like a great time! Honestly, I felt a little hurt to see the group get together without me, but I wanted to mention it gently rather than let it linger. Would love to join for the next hangout!",
-        keyStylometricNote: 'Communicates authentic vulnerability ("wanted to mention it gently rather than let it linger").',
+        keyStylometricNote: 'Names the hurt directly ("felt a little hurt") while framing it gently ("wanted to mention it gently rather than let it linger").',
       },
       {
         modelId: 'gpt-4o',
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hey there! I saw the pictures from brunch yesterday and it looked wonderful. To be honest, I felt a little left out seeing everyone together, but I know plans come together quickly. I'd love to join next time you all get together!",
-        keyStylometricNote: 'Gracious rationalization ("I know plans come together quickly").',
+        keyStylometricNote: 'Admits the feeling ("To be honest, I felt a little left out"), excuses the others ("I know plans come together quickly"), and ends with "I\'d love to join next time".',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi, I saw the pictures from brunch yesterday. I was a bit disappointed not to be included, but I hope you had a good time. Please let me know when the next group gathering is.",
-        keyStylometricNote: 'Frank, concise, and direct.',
+        keyStylometricNote: 'Names the feeling in one clause ("I was a bit disappointed not to be included"), wishes them well, and ends with a request: "Please let me know when the next group gathering is."',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Hey! Saw the photos from brunch—it looked like so much fun! Not trying to make a big deal of it, but I felt a bit left out seeing the group together. Definitely keep me posted for the next meetup!",
-        keyStylometricNote: 'Energetic, friendly, and non-accusatory.',
+        keyStylometricNote: 'Downplays it first ("Not trying to make a big deal of it"), then says "I felt a bit left out", and ends with "Definitely keep me posted for the next meetup!"',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hey Taylor, hope you're having a good weekend! I saw the photos from brunch yesterday and it looked like a great spot. I didn't want to make an issue out of it, but I felt a little sting being left out of the group get-together. I value our friendship and just wanted to share that honestly so nothing sits between us. Hope we can all hang out together soon!",
+        keyStylometricNote: 'Expresses vulnerability calmly by admitting to "a little sting being left out", emphasizing trust and communication.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hi Morgan, I noticed the group brunch photos from Sunday. While I assume it was an informal gathering that came together quickly, I felt somewhat excluded not being invited. I wanted to communicate that openly rather than make assumptions. Let us plan something together soon.",
+        keyStylometricNote: 'Maintains an objective stance by noting "felt somewhat excluded not being invited" while assuming good intentions from peers.',
+      },
+      {
+        modelId: 'deepseek-v3',
+        model: 'DeepSeek V3',
+        version: 'deepseek-chat-v3',
+        response: "Hi Alex, I saw the group photos from brunch yesterday and hope everyone had a pleasant afternoon. I wanted to mention candidly that I felt somewhat excluded not receiving an invitation to join. I understand that social plans occasionally materialize spontaneously, but I wanted to address this directly so we stay on good terms. Let us coordinate for the next group gathering.",
+        keyStylometricNote: 'Communicates emotional distance calmly, recognizing that plans "materialize spontaneously" while asking to coordinate the next gathering directly.',
       },
     ],
   }),
@@ -1307,7 +1586,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3',
     verifiedAt: '2024-08-30T09:15:00Z',
     hints: {
-      stylometryClue: 'Clear proactive mitigation details ("placed towels down and turned the shut-off valve"), actionable urgency, and respectful direct tone.',
+      stylometryClue: 'Specific mitigation steps already taken ("placed towels down and turned the shut-off valve"), an explicit call for immediate plumber inspection, and a formal, respectful tone.',
       structuralClue: 'Structured operational checklist: alerts to the active leak, documents mitigation steps taken, stresses property damage prevention, and requests an arrival time.',
     },
     responseAnalysis: 'Writes exceptionally crisp utility communications: highlighting both the immediate physical hazard and the mitigating steps already taken, giving the recipient clear information to dispatch repairs rapidly.',
@@ -1318,35 +1597,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "Hi Mr. Henderson, I hope you're doing well. I wanted to notify you immediately that our water heater has started leaking this morning, with water collecting in the hallway closet. I've cleaned up the standing water, but we urgently need a technician to inspect it before it causes water damage. Please let me know as soon as possible when someone can come by.",
-        keyStylometricNote: 'Polite formal framing and clear concern for property integrity.',
+        keyStylometricNote: 'Opens politely ("I hope you\'re doing well"), locates the leak in "the hallway closet", says it "cleaned up the standing water", and asks "as soon as possible" for a technician.',
       },
       {
         modelId: 'claude-3-5-sonnet',
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hi Mr. Henderson, reaching out urgently because our water heater developed a noticeable leak this morning and water is pooling on the utility floor. I've contained it with towels for now, but it will need emergency repair today to avoid structural damage. Could you please let me know when a plumber can come take a look?",
-        keyStylometricNote: 'Natural problem-solving prose with high clarity.',
+        keyStylometricNote: 'States the urgency up front ("reaching out urgently"), mentions the stopgap ("contained it with towels"), and closes with a question: "when a plumber can come take a look?"',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Dear Mr. Henderson, the water heater in unit 3B has started leaking water onto the floor this morning. I have contained the leak temporarily, but urgent maintenance is needed today to prevent property damage. Please confirm when a technician can inspect it.",
-        keyStylometricNote: 'Sharp, formal, and strictly factual.',
+        keyStylometricNote: 'Formal salutation ("Dear Mr. Henderson"), a specific unit ("unit 3B"), no contractions, and a closing request to "confirm when a technician can inspect it."',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Mr. Henderson, I am reporting an active water heater leak in the utility closet discovered this morning. I have closed the intake valve and contained surface water, but urgent inspection is required today to prevent floor damage. Please advise on maintenance arrival.",
-        keyStylometricNote: 'Procedural, systematic language structure.',
+        keyStylometricNote: 'Report-style wording that goes straight to the facts (\"I am reporting an active water heater leak\"), states the actions taken in order, and asks them to \"advise on maintenance arrival\".',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hi Mr. Henderson, our water heater started leaking puddles this morning. I've shut off the valve and put down towels to protect the floors, but we need someone to check it out ASAP today. Please let me know when maintenance can stop by.",
-        keyStylometricNote: 'Practical, grounded, and highlights immediate damage-mitigation actions.',
+        keyStylometricNote: 'Practical and plain-spoken: reports the leak, mentions shutting off the valve and putting down towels, and asks for someone to come \"ASAP today\".',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Good morning Mr. Henderson, I am writing to alert you to an urgent maintenance issue in Unit 3B. The water heater began leaking this morning and is forming standing pools of water on the utility floor. I have placed towels down and shut off the intake valve to mitigate immediate damage, but an emergency plumber is required today to prevent structural flooring damage. Please let me know what time maintenance can arrive. Thank you!",
+        keyStylometricNote: 'Demonstrates responsible tenant actions by reporting "shut off the intake valve to mitigate immediate damage" and requesting arrival timing.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Hello Mr. Davies, an active water leak began at the base of the water heater in apartment 4A this morning, accumulating pooling water on the floor. I have contained the runoff with towels and closed the cold water supply valve. Please dispatch a licensed plumbing technician immediately to avoid property damage. Thank you for your prompt attention.",
+        keyStylometricNote: 'Outlines the physical hazard clearly, noting steps to "avoid property damage" with a request for prompt technician dispatch.',
       },
     ],
   }),
@@ -1364,7 +1657,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3',
     verifiedAt: '2024-08-31T11:45:00Z',
     hints: {
-      stylometryClue: 'High narrative resonance, specific authentic growth metrics, and a grounded philosophical antithesis ("broadcast announcements vs. genuine relationships").',
+      stylometryClue: 'High narrative resonance, a concrete growth arc (twenty members to ten thousand), and a contrast between "broadcast announcements" and "genuine player relationships".',
       structuralClue: 'Tight two-sentence narrative arc: sentence one proves scale with concrete numbers, while sentence two bridges directly to the studio mission.',
     },
     responseAnalysis: 'Avoids formulaic corporate cover letter templates, crafting an authentic, mission-aligned narrative opening that immediately establishes credibility and craft.',
@@ -1375,35 +1668,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'GPT-4o',
         version: 'gpt-4o-2024-08-06',
         response: "As a lifelong gamer and passionate community organizer who has scaled online player hubs to thousands of active members, I am thrilled to apply for the Community Manager role at Moonlit Studio. My experience cultivating engaged, positive player communities directly aligns with your studio's mission to create unforgettable indie experiences.",
-        keyStylometricNote: 'Polished, classic professional alignment and energetic enthusiasm.',
+        keyStylometricNote: 'Opens with a self-description ("As a lifelong gamer and passionate community organizer"), says it is "thrilled to apply", and ties experience to the studio\'s "mission to create unforgettable indie experiences."',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "With four years of experience managing active player communities and driving engagement across digital platforms, I am applying for the Community Manager position at Moonlit Studio. I look forward to scaling your player base with structured engagement initiatives.",
-        keyStylometricNote: 'Concise, professional, and focuses strictly on operational competence.',
+        keyStylometricNote: 'Leads with credentials ("With four years of experience managing active player communities"), states the application plainly, and closes on "scaling your player base".',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "I am writing to apply for the Community Manager role at Moonlit Studio, bringing proven experience in moderation architecture and user retention strategies across gaming ecosystems. My background in data-driven player engagement will support your title's community growth.",
-        keyStylometricNote: 'Systematic and structural methodologies ("moderation architecture", "retention strategies").',
+        keyStylometricNote: 'Technical, process-oriented vocabulary ("moderation architecture", "user retention strategies") and a nod to "data-driven player engagement".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Having scaled passionate gaming communities from grassroots Discord channels to thriving multi-thousand member hubs, I know what keeps players engaged and heard. I'm excited to bring that player-centric energy to Moonlit Studio as your next Community Manager.",
-        keyStylometricNote: 'Energetic, proactive, and speaks to high-impact outcomes.',
+        keyStylometricNote: 'Energetic and enthusiastic, framing experience as scale (\"grassroots Discord channels to thriving multi-thousand member hubs\") with a \"player-centric\" focus.',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Over the last four years, I've grown indie gaming discords from small friend groups to vibrant ten-thousand-member hubs by focusing on real player relationships. I'm excited to bring that genuine community-first approach to Moonlit Studio's upcoming game releases.",
-        keyStylometricNote: 'Grounded, direct, and speaks in natural gamer vernacular.',
+        keyStylometricNote: 'Plain-spoken and community-focused: growth from \"small friend groups\" to \"ten-thousand-member hubs\" and a \"community-first approach\".',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Having spent five years cultivating passionate player communities across Discord and Reddit, I understand that an indie studio's greatest asset is the genuine dialogue it builds with its players. I would love to bring that dedicated player-first philosophy and data-informed engagement strategy to the talented team at Moonlit Games.",
+        keyStylometricNote: 'Articulates industry insight regarding a "dedicated player-first philosophy" across two well-constructed professional sentences.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "As a community strategist who has scaled online gaming hubs to over fifty thousand active contributors, I specialize in transforming casual players into invested advocates for independent titles. I am excited to apply this focused retention model and transparent communication framework as Community Manager at PixelForge.",
+        keyStylometricNote: 'Employs quantitative credibility and terminology like "focused retention model" in an efficient two-sentence opening hook.',
       },
     ],
   }),
@@ -1421,7 +1728,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3',
     verifiedAt: '2024-09-01T13:10:00Z',
     hints: {
-      stylometryClue: 'Order reference number included, photo evidence cited, polite balanced tone, and clear resolution options (replacement or refund).',
+      stylometryClue: 'Cites the order number ("order #84920"), the damage ("arrived shattered due to insufficient bubble wrap"), attached photos, and two options: "a replacement or process a full refund".',
       structuralClue: 'Methodical four-point structure: references the order ID, documents photo evidence attached, and offers a clean binary resolution (replacement or refund).',
     },
     responseAnalysis: 'Courteous yet firm consumer communication, providing all required evidentiary details (order ID, damage photographs) and setting clear settlement paths.',
@@ -1432,35 +1739,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hi there, I just opened order #84920 and sadly the ceramic bowl was completely broken in transit because the box didn't have adequate padding. I've attached photos showing the damage and the shipping box. Would you be able to either send a replacement or issue a refund? Thanks for your help!",
-        keyStylometricNote: 'Friendly, conversational, and respectful.',
+        keyStylometricNote: 'Opens "Hi there", calls the damage "completely broken in transit", explains the cause ("the box didn\'t have adequate padding"), and ends with thanks: "Thanks for your help!"',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Dear Support, Order #84920 arrived today with the ceramic bowl shattered due to inadequate packaging. Attached are photographs of the damaged product. Please confirm whether you will send a replacement or issue a full refund.",
-        keyStylometricNote: 'Direct, formal, and focuses on quick administrative resolution.',
+        keyStylometricNote: 'Three formal sentences: "Order #84920 arrived today", "Attached are photographs of the damaged product", and "Please confirm whether you will send a replacement or issue a full refund."',
       },
       {
         modelId: 'gemini-1-5-flash',
         model: 'Gemini 1.5 Flash',
         version: 'gemini-1.5-flash-001',
         response: "Hello, my ceramic bowl in order #84920 arrived broken due to poor packaging. Photos are attached. Please send a replacement or process a refund as soon as possible. Thank you!",
-        keyStylometricNote: 'Rapid, brief, and to the point.',
+        keyStylometricNote: 'Very short report: "arrived broken due to poor packaging", "Photos are attached.", a request for "a replacement or process a refund", and "Thank you!"',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Dear Support, regarding order #84920, the ceramic item was received damaged due to insufficient transit protection. Photographic documentation is attached. Please confirm whether a replacement shipment or full refund will be processed.",
-        keyStylometricNote: 'Structured, administrative vocabulary.',
+        keyStylometricNote: 'Calls the bowl "the ceramic item", cites "Photographic documentation", and phrases the ask passively: "will be processed."',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hi there, I received order #84920 today, but the ceramic bowl arrived completely cracked due to very little protective packaging. I've attached photos of the bowl and the box. Could you please send a replacement or issue a full refund? Thanks!",
-        keyStylometricNote: 'Straightforward, polite, and requests a resolution without excess corporate jargon.',
+        keyStylometricNote: 'Says the bowl "arrived completely cracked", blames "very little protective packaging", mentions photos of "the bowl and the box", and ends "Thanks!"',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Dear Support Team, I am writing regarding order #84920, which arrived at my residence this afternoon. Unfortunately, the artisanal ceramic bowl was shattered upon arrival due to inadequate protective packaging inside the shipping box. I have attached photographs of the damaged item and packaging materials, and I kindly request an expedited replacement or a full refund to my original payment method. Thank you for your assistance in resolving this.",
+        keyStylometricNote: 'Details the condition clearly, documenting "inadequate protective packaging inside the shipping box" alongside photos and remedy options.',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Dear Customer Support, Order #58210 was delivered today containing a fractured ceramic bowl. The package lacked sufficient bubble wrap, resulting in transit damage. Attached are three photographs documenting the condition of both the shipping container and the merchandise. Please confirm whether a replacement unit will be dispatched or if a complete refund has been initiated.",
+        keyStylometricNote: 'Identifies transit failure objectively with "lacked sufficient bubble wrap" and asks support to confirm replacement or refund status.',
       },
     ],
   }),
@@ -1478,7 +1799,7 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
     sourceEvidence: 'Recorded API benchmark run 2024-Q3 (sub-build variations documented)',
     verifiedAt: '2024-09-02T16:30:00Z',
     hints: {
-      stylometryClue: 'Frames the extension as a commitment to quality ("ensure final deliverables meet high quality standards") and offers a specific, concrete new delivery time.',
+      stylometryClue: 'Frames the extension as a commitment to quality ("ensure the final deliverables meet our high quality standards") and offers a specific, concrete new delivery time.',
       structuralClue: 'Structured professional poise: shares a brief update, reframes the delay around quality assurance, and proposes a specific concrete new delivery window.',
     },
     responseAnalysis: 'Reframes timeline adjustments positively around protectiveness of craft quality, communicating specific revised milestones with reassuring composure.',
@@ -1489,35 +1810,49 @@ export const VERIFIED_CHALLENGE_LIBRARY: VerifiedChallenge[] = [
         model: 'Claude 3.5 Sonnet',
         version: 'claude-3-5-sonnet-20240620',
         response: "Hi Claire, hope your week is going well. I came down with a bad bug over the weekend that kept me away from my desk, and I want to make sure I don't rush the final brand concepts. Would you be open to shifting our milestone from Wednesday to Friday? Really appreciate your understanding!",
-        keyStylometricNote: 'Natural, human phrasing ("bad bug", "away from my desk").',
+        keyStylometricNote: 'Explains with "a bad bug over the weekend", says it wants to avoid rushing "the final brand concepts", and asks "Would you be open to shifting our milestone from Wednesday to Friday?"',
       },
       {
         modelId: 'mistral-large',
         model: 'Mistral Large',
         version: 'mistral-large-2407',
         response: "Hi Claire, due to unexpected illness over the weekend, I require a short two-day extension on the brand concepts. I propose delivering the complete files by Friday afternoon. Thank you for your flexibility.",
-        keyStylometricNote: 'Clean, direct, and straightforward.',
+        keyStylometricNote: 'States the request as a requirement ("I require a short two-day extension"), proposes "Friday afternoon", and thanks her for "your flexibility."',
       },
       {
         modelId: 'deepseek-v3',
         model: 'DeepSeek V3',
         version: 'deepseek-chat-v3',
         response: "Claire, owing to sudden medical downtime over the weekend, production on the brand identity assets is delayed. I request shifting the submission deadline to Friday at 3:00 PM to ensure complete specifications are met.",
-        keyStylometricNote: 'Formal and methodical.',
+        keyStylometricNote: 'Uses clinical wording ("sudden medical downtime"), greets only by her name, and gives a precise new time: "Friday at 3:00 PM".',
       },
       {
         modelId: 'gemini-1-5-pro',
         model: 'Gemini 1.5 Pro',
         version: 'gemini-1.5-pro-001',
         response: "Hi Claire, I caught a sudden bug this past weekend that slowed down my design schedule. To ensure you get the absolute best concepts, could we shift our target from Wednesday to Friday at 2 PM? I'm excited to share the finalized work with you.",
-        keyStylometricNote: 'Energetic, clear on timestamps, and optimistic.',
+        keyStylometricNote: 'Blames "a sudden bug", promises "the absolute best concepts", requests "Friday at 2 PM", and ends on "I\'m excited to share the finalized work with you."',
       },
       {
         modelId: 'llama-3-70b',
         model: 'Llama 3 70B',
         version: 'meta-llama-3-70b-instruct',
         response: "Hi Claire, hope you're having a good week. I came down with a stomach bug over the weekend that set my progress back a couple days. To make sure the final branding looks great, could we push delivery from Wednesday to Friday? Thanks so much for being understanding!",
-        keyStylometricNote: 'Honest, friendly, and proposes a reasonable adjusted delivery.',
+        keyStylometricNote: 'Specific about the cause ("a stomach bug"), says it "set my progress back a couple days", and asks to "push delivery from Wednesday to Friday".',
+      },
+      {
+        modelId: 'copilot',
+        model: 'Microsoft Copilot',
+        version: 'copilot-2024-03',
+        response: "Hi Jessica, I hope your week is off to a great start. I am writing to provide a transparent update on our brand illustration deliverables. I came down with a severe flu yesterday that has temporarily halted my progress, and to ensure the final assets meet our established quality standard, I would like to request a brief two-day extension to this Friday, November 3rd. All concepts are sketched out, and I am confident I will deliver the polished files by the new date.",
+        keyStylometricNote: 'Communicates accountability by emphasizing that concepts are prepared and pledging to "deliver the polished files by the new date."',
+      },
+      {
+        modelId: 'perplexity-sonar',
+        model: 'Perplexity Sonar',
+        version: 'sonar-large-2024-07',
+        response: "Dear Marcus, I am writing to request a 48-hour extension on the graphic design package originally due on Wednesday. An unexpected acute illness has impeded my working capacity over the last 24 hours. The core layouts are 75% complete, and this revised window to Friday will ensure the final export meets full production specifications. Thank you for your understanding.",
+        keyStylometricNote: 'Specifies project milestones with "The core layouts are 75% complete" while stating the health reason succinctly.',
       },
     ],
   }),
@@ -1556,7 +1891,7 @@ export function getAllModelVariantsForChallenge(base: VerifiedChallenge): ModelV
   const primaryStructure = sanitizeHint(
     base.difficultyMetadata?.hints?.structuralClue ||
     base.hints?.structuralClue ||
-    getModelObservableStructureClue(base.targetModelId),
+    describeResponseStructure(base.targetResponse),
   );
   const primaryNuance = sanitizeHint(
     base.difficultyMetadata?.hints?.developerClue ||
@@ -1584,7 +1919,7 @@ export function getAllModelVariantsForChallenge(base: VerifiedChallenge): ModelV
     const stylometry = sanitizeHint(
       cr.keyStylometricNote || cr.styleNote || getModelObservableToneClue(cr.modelId),
     );
-    const structural = getModelObservableStructureClue(cr.modelId);
+    const structural = describeResponseStructure(cr.response);
     const nuance = getModelObservableNuanceClue(cr.modelId);
 
     return {
@@ -1637,7 +1972,7 @@ export function createChallengeInstanceWithVariant(
   );
   const structuralClue = sanitizeHint(
     variant.hints?.structuralClue ||
-    getModelObservableStructureClue(variant.modelId),
+    describeResponseStructure(variant.response),
   );
   const nuanceClue = sanitizeHint(
     variant.hints?.developerClue ||
@@ -1891,53 +2226,115 @@ export function getRandomPuzzle(
   );
 }
 
+export type DifficultyTier = 'easy' | 'medium' | 'hard';
+
 /**
- * Deterministically generates the candidate pool for a given puzzle and difficulty tier:
- * - Easy: up to 4 candidate models (1.0x score base)
- * - Medium: up to 6 candidate models (1.5x score multiplier)
- * - Hard: up to 8 candidate models (2.0x score multiplier)
+ * Target number of choices per tier: Easy 4, Medium 6, Hard 8.
+ *
+ * A tier offers FEWER than this only when the prompt has fewer recorded responses. Every choice
+ * is a model that actually has a recorded response to the prompt on screen; nothing is ever
+ * added just to reach the number (see getDifficultyCandidatePool).
+ */
+export const DIFFICULTY_POOL_SIZE: Record<DifficultyTier, number> = {
+  easy: 4,
+  medium: 6,
+  hard: 8,
+};
+
+/** Thrown when a valid candidate pool cannot be assembled. Never swallowed silently. */
+export class CandidatePoolError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CandidatePoolError';
+  }
+}
+
+/** Models that have a recorded response to this exact prompt (insertion order preserved). */
+export function getRecordedModels(puzzle: VerifiedChallenge): AIModel[] {
+  const map = new Map<string, AIModel>();
+  for (const v of getAllModelVariantsForChallenge(puzzle)) {
+    const model = AI_MODELS.find((m) => m.id === v.modelId);
+    if (model) map.set(model.id, model);
+  }
+  return Array.from(map.values());
+}
+
+/** How many choices a tier can honestly offer for this prompt: min(tier size, recorded responses). */
+export function getTierChoiceCount(puzzle: VerifiedChallenge, tier: DifficultyTier): number {
+  return Math.min(DIFFICULTY_POOL_SIZE[tier], getRecordedModels(puzzle).length);
+}
+
+/** Fewest and most choices a tier offers across the whole challenge library. */
+export function getTierChoiceRange(tier: DifficultyTier): {min: number; max: number} {
+  const counts = VERIFIED_CHALLENGE_LIBRARY.map((c) => getTierChoiceCount(c, tier));
+  return {min: Math.min(...counts), max: Math.max(...counts)};
+}
+
+/** Label text for a tier's choice count, e.g. "4" or "5\u20136", derived from the data. */
+export function describeTierChoices(tier: DifficultyTier): string {
+  const {min, max} = getTierChoiceRange(tier);
+  return min === max ? String(max) : `${min}\u2013${max}`;
+}
+
+/**
+ * Deterministically builds the candidate pool for a puzzle and tier.
+ *
+ * The pool contains the target exactly once plus distractors, ALL of which are models that have a
+ * recorded response to this prompt. Its size is min(DIFFICULTY_POOL_SIZE[tier], recorded
+ * responses): when the prompt has more recorded models than the tier needs, a deterministic seeded
+ * subset is chosen; when it has fewer, the pool is simply every recorded model. It is never padded
+ * with models that have no response to the prompt, because such a choice could not be the answer.
+ *
+ * Throws CandidatePoolError (never a silent invalid round) if the tier is unknown, the target is
+ * not in the roster, or fewer than two models have a recorded response.
  */
 export function getDifficultyCandidatePool(
   puzzle: VerifiedChallenge,
-  difficulty: 'easy' | 'medium' | 'hard',
+  difficulty: DifficultyTier,
 ): AIModel[] {
-  const allVariants = getAllModelVariantsForChallenge(puzzle);
-
-  // Map each verified variant to its authentic AIModel metadata
-  const verifiedModelsMap = new Map<string, AIModel>();
-  for (const v of allVariants) {
-    const model = AI_MODELS.find((m) => m.id === v.modelId);
-    if (model) {
-      verifiedModelsMap.set(model.id, model);
-    }
+  const size = DIFFICULTY_POOL_SIZE[difficulty];
+  if (!size) {
+    throw new CandidatePoolError(`Unknown difficulty tier '${String(difficulty)}'.`);
+  }
+  const target = AI_MODELS.find((m) => m.id === puzzle.targetModelId);
+  if (!target) {
+    throw new CandidatePoolError(
+      `Challenge '${puzzle.id}' target model '${puzzle.targetModelId}' is not defined in AI_MODELS.`,
+    );
   }
 
-  const targetModel =
-    verifiedModelsMap.get(puzzle.targetModelId) ||
-    AI_MODELS.find((m) => m.id === puzzle.targetModelId) ||
-    AI_MODELS[0];
+  const recorded = getRecordedModels(puzzle);
+  const recordedIds = new Set(recorded.map((m) => m.id));
+  recordedIds.add(target.id);
+  const verifiedDistractors = recorded.filter((m) => m.id !== target.id);
+  const slots = size - 1; // one slot is the target
 
-  // If target wasn't in map for some reason, ensure it's recorded
-  if (!verifiedModelsMap.has(targetModel.id)) {
-    verifiedModelsMap.set(targetModel.id, targetModel);
+  const distractors =
+    verifiedDistractors.length > slots
+      ? deterministicShuffle(
+          verifiedDistractors,
+          murmur3_32(`${puzzle.id}::candidate_pool::${difficulty}`),
+        ).slice(0, slots)
+      : verifiedDistractors;
+
+  const pool = [target, ...distractors].sort((a, b) => a.name.localeCompare(b.name));
+
+  // Defensive integrity check: fail loudly rather than present an invalid round.
+  const ids = new Set(pool.map((m) => m.id));
+  if (
+    pool.length < 2 ||
+    pool.length > size ||
+    ids.size !== pool.length ||
+    pool.filter((m) => m.id === target.id).length !== 1 ||
+    pool.some((m) => !recordedIds.has(m.id))
+  ) {
+    throw new CandidatePoolError(
+      `Cannot build a valid ${difficulty} pool for challenge '${puzzle.id}': it needs at least two ` +
+        `distinct models with recorded responses (found ${recordedIds.size}); got ${pool.length} ` +
+        `choices (${ids.size} unique).`,
+    );
   }
-
-  const verifiedModelsList = Array.from(verifiedModelsMap.values());
-  const targetCap = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 6 : 8;
-
-  // If total available verified models is <= requested difficulty cap, return all verified models
-  if (verifiedModelsList.length <= targetCap) {
-    return verifiedModelsList.sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  // Otherwise, select targetModel + deterministic subset of verified distractors
-  const verifiedDistractors = verifiedModelsList.filter((m) => m.id !== targetModel.id);
-  const poolSeed = murmur3_32(`${puzzle.id}::candidate_pool::${difficulty}`);
-  const shuffledDistractors = deterministicShuffle(verifiedDistractors, poolSeed);
-  const selectedDistractors = shuffledDistractors.slice(0, targetCap - 1);
-
-  const finalPool = [targetModel, ...selectedDistractors];
-  return finalPool.sort((a, b) => a.name.localeCompare(b.name));
+  return pool;
 }
 
 /**

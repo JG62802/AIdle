@@ -24,6 +24,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import {getConfig, THEME} from './constants';
+import {CANONICAL_URL, shareAIdle} from './share';
 import BackgroundMusic from './utils/BackgroundMusic';
 import {
   createFixedStepper,
@@ -42,6 +43,7 @@ import {
   ChallengeCategory,
   evaluateGuess,
   getDailyPuzzle,
+  describeTierChoices,
   getDifficultyCandidatePool,
   getPreviousUTCDateKey,
   getRandomPuzzle,
@@ -53,8 +55,9 @@ import {
 
 const BACKGROUND_MUSIC_URL = 'assets/audio/bgm_synth_ambient.mp3';
 
-// Public address appended to shared results. Keep in sync with the URLs in index.html.
-const SHARE_URL = 'https://aidle-two.vercel.app';
+// Public address appended to shared results. Single source of truth is CANONICAL_URL in ./share
+// (the production domain, never a *.vercel.app deployment URL). Keep in sync with the URLs in index.html.
+const SHARE_URL = CANONICAL_URL;
 
 const ASSETS_MANIFEST: Record<string, string> = {
   logo: '/images/app_logo_mark.png',
@@ -210,7 +213,7 @@ interface ScoreBreakdown {
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stepperRef = useRef<ReturnType<typeof createFixedStepper>>();
+  const stepperRef = useRef<ReturnType<typeof createFixedStepper> | undefined>(undefined);
   const isMobile = useIsMobile();
 
   // --- ASSETS ---
@@ -362,9 +365,10 @@ export default function App() {
 
   const maxGuessesAllowed = getConfig('maxGuesses') as number;
 
-  // Candidate pool derived deterministically from the puzzle and difficulty tier
-  // Easy: 4 models | Medium: 6 models | Hard: 8 models
-  // In daily mode, difficulty is standardized to 'medium' (6 models benchmark)
+  // Candidate pool derived deterministically from the puzzle and difficulty tier.
+  // Every choice is a model with a recorded response to this prompt; a tier offers
+  // min(tier size, recorded responses): Easy 4, Medium up to 6, Hard up to 8.
+  // In daily mode, difficulty is standardized to 'medium'.
   const candidatePool = useMemo(() => {
     const activeDiff = gameMode === 'daily' ? 'medium' : difficulty;
     return getDifficultyCandidatePool(currentPuzzle, activeDiff);
@@ -955,6 +959,30 @@ export default function App() {
     }
   };
 
+  // General-purpose "Share AIdle" CTA (header + main menu). Shares only the canonical link,
+  // never a player's score or results (see handleShare for the post-game results share).
+  const isSharingAIdleRef = useRef(false);
+  const handleShareAIdle = async () => {
+    // Ignore repeat taps while the system share sheet is open (it would reject as "already in progress").
+    if (isSharingAIdleRef.current) return;
+    isSharingAIdleRef.current = true;
+    try {
+      gameAudio.playCrispClick();
+      const outcome = await shareAIdle({
+        nav: typeof navigator !== 'undefined' ? navigator : undefined,
+        copy: copyToClipboard,
+      });
+      if (outcome === 'copied') {
+        gameAudio.playCoinPickup();
+        triggerToast('Link copied! Paste it to invite a friend.');
+      } else if (outcome === 'failed') {
+        triggerToast(`Couldn't copy automatically. Link: ${CANONICAL_URL}`);
+      }
+    } finally {
+      isSharingAIdleRef.current = false;
+    }
+  };
+
   // Canvas Grain / Paper ruling background
   const draw = (ctx: CanvasRenderingContext2D) => {
     prepareCanvas(ctx, canvasWidth, canvasHeight);
@@ -1144,6 +1172,17 @@ export default function App() {
               <span className="hidden md:inline">Stats</span>
             </button>
 
+            {/* Share AIdle (general invite link; does not share results) */}
+            <button
+              onClick={handleShareAIdle}
+              data-testid="share-aidle-header"
+              aria-label="Share AIdle"
+              title="Share AIdle"
+              className="px-2.5 py-1.5 rounded text-xs font-medium text-[#777777] hover:text-[#242424] hover:bg-[#F8F7F3] border border-transparent hover:border-[#E5E3DE] transition-colors flex items-center gap-1">
+              <Share2 size={15} />
+              <span className="hidden md:inline">Share</span>
+            </button>
+
             {/* In-Game Header Restart Button */}
             {gameState.status === 'PLAYING' && (
               <button
@@ -1273,7 +1312,7 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-[#777777] font-medium bg-[#F8F7F3] border border-[#E5E3DE] px-1.5 py-0.5 rounded">
-                    {activeDifficultyTier.toUpperCase()} ({candidatePool.length} Verified AI)
+                    {activeDifficultyTier.toUpperCase()} ({candidatePool.length} AI)
                   </span>
                   <span className="text-[11px] font-mono text-[#777777]">
                     {maxGuessesAllowed - guesses.length} left
@@ -1438,7 +1477,7 @@ export default function App() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#777777] mr-1 shrink-0">
                   Filter:
                 </span>
-                {['All', 'OpenAI', 'Anthropic', 'Google', 'Meta', 'Mistral', 'Open-Source'].map(
+                {['All', 'OpenAI', 'Anthropic', 'Google', 'Microsoft', 'Perplexity AI', 'Meta', 'xAI', 'DeepSeek', 'Mistral', 'Open-Source'].map(
                   (filter) => (
                     <button
                       key={filter}
@@ -1465,7 +1504,7 @@ export default function App() {
                     <button
                       onClick={() => setActiveCandidateFilter('All')}
                       className="block mx-auto mt-1 text-[#477A60] font-semibold hover:underline">
-                      Show all {candidatePool.length} verified candidates
+                      Show all {candidatePool.length} candidates
                     </button>
                   </div>
                 ) : (
@@ -1692,10 +1731,16 @@ export default function App() {
                             ? 'bg-[#242424] text-[#FFFFFF]'
                             : 'bg-[#FFFFFF] text-[#777777] hover:text-[#242424] border border-[#E5E3DE]'
                         }`}>
-                        {diff} ({diff === 'easy' ? '4 AI' : diff === 'medium' ? '6 AI' : '8 AI'})
+                        {diff} ({describeTierChoices(diff)} AI)
                       </button>
                     ))}
                   </div>
+                  {describeTierChoices('hard') !== '8' && (
+                    <p data-testid="difficulty-note" className="text-[11px] text-[#777777] leading-snug mt-1.5">
+                      Medium and Hard offer every model with a recorded response to the prompt, up to 6 and 8.
+                      Hard allows one clue.
+                    </p>
+                  )}
                 </div>
 
                 <button
@@ -1725,6 +1770,14 @@ export default function App() {
                   <ShieldCheck size={14} className="text-[#477A60]" /> Verified Data Info
                 </button>
               </div>
+
+              {/* Share AIdle (general invite link; does not share results) */}
+              <button
+                onClick={handleShareAIdle}
+                data-testid="share-aidle-menu"
+                className="mx-auto -mt-1 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-[#477A60] hover:bg-[#EDF5F0] border border-[#477A60]/30 rounded px-3.5 py-2 transition-colors min-h-[36px]">
+                <Share2 size={14} /> Share AIdle
+              </button>
             </div>
           </div>
         </MenuOverlay>
